@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "387199907728",
+    "project_id": "rodomvp-bfb45",
+    "storage_bucket": "rodomvp-bfb45.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:387199907728:android:980d243668cbd23e48a515",
+        "android_client_info": {
+          "package_name": "com.example.rodo_mvp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCcyHpjtqaGSvVWSyVgnqaiDYOLf2Qoquw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
