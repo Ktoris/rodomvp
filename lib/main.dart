@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'role_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'intro_page.dart';
+import 'app_theme.dart'; // Integrated custom theme file
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,28 +21,30 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Rodo MVP',
-      theme: ThemeData(
-        primarySwatch: Colors.deepPurple,
-      ),
-      home: const HomePage(),
-    );
-  }
-}
+      // Removes the red debug banner from the top right corner
+      debugShowCheckedModeBanner: false, 
+      
+      // Applies your professional "Modern SaaS" theme globally
+      theme: AppTheme.lightTheme, 
+      
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          // While Firebase is checking the login status
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+          // If the user is already logged in, send them to the RoleRouter
+          if (snapshot.hasData) {
+            return const RoleRouter(); 
+          }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Rodo MVP'),
-      ),
-      body: const Center(
-        child: Text(
-          'Firebase connected!',
-          style: TextStyle(fontSize: 24),
-        ),
+          // If the user is NOT logged in, send them to the Login/Signup page
+          return const IntroPage(); 
+        },
       ),
     );
   }
