@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:rodo_mvp/role_router.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -60,6 +61,11 @@ class _AuthPageState extends State<AuthPage> {
           'email': emailController.text.trim(),
           'createdAt': FieldValue.serverTimestamp(),
         });
+      }
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const RoleRouter()),
+        );
       }
     } catch (e) {
       setState(() {
