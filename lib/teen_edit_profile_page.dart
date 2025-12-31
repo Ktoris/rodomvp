@@ -62,7 +62,7 @@ class _TeenEditProfilePageState extends State<TeenEditProfilePage> {
         .doc(widget.teenId)
         .get();
 
-    final data = doc.data() as Map<String, dynamic>?;
+    final data = doc.data();
 
     if (data != null) {
       nameController.text = data['name'] ?? '';

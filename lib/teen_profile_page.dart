@@ -42,7 +42,9 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
 
   Future<void> saveProfile() async {
     if (nameController.text.isEmpty ||
-        surnameController.text.isEmpty) return;
+        surnameController.text.isEmpty) {
+      return;
+    }
 
     // Add any remaining text in the skill input field before saving
     final remainingSkill = skillInputController.text.trim();

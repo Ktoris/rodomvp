@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'teen_profile_page.dart';
-import 'adult_profile_page.dart'
+import 'adult_profile_page.dart';
 
 class AccountSelectionPage extends StatelessWidget {
   const AccountSelectionPage({super.key});
@@ -30,7 +30,7 @@ class AccountSelectionPage extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => AdultPage(), // NOT const
+                    builder: (_) => const AdultProfilePage(),
                   ),
                 );
               },

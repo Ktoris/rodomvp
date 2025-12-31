@@ -34,8 +34,8 @@ class TeenDashboard extends StatelessWidget {
             ),
           );
         },
-        child: const Icon(Icons.edit),
         tooltip: 'Edit Profile',
+        child: const Icon(Icons.edit),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
