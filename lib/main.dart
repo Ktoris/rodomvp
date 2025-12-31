@@ -28,23 +28,21 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme, 
       
       home: StreamBuilder<User?>(
-        // OPTIMIZATION 1: Use idTokenChanges for more reliable triggers on web
-        stream: FirebaseAuth.instance.idTokenChanges(),
+        stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
-          // While Firebase is checking the login status (e.g., loading from LocalStorage)
+          // While Firebase is checking the login status
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
           }
 
-          // OPTIMIZATION 2: Explicitly check if the user is authenticated
-          // This snapshot.hasData check determines the persistent landing page
-          if (snapshot.hasData && snapshot.data != null) {
+          // If the user is already logged in, send them to the RoleRouter
+          if (snapshot.hasData) {
             return const RoleRouter(); 
           }
 
-          // If the user is NOT logged in, show the Intro/Auth flow
+          // If the user is NOT logged in, send them to the Login/Signup page
           return const IntroPage(); 
         },
       ),
