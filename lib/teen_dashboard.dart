@@ -378,10 +378,10 @@ class TeenDashboard extends StatelessWidget {
                                     Icons.cancel,
                                     color: Colors.red,
                                   ),
-                                  tooltip: 'Reject',
+                                  tooltip: 'Ignore',
                                   onPressed: () {
                                     doc.reference.update({
-                                      'status': 'rejected',
+                                      'status': 'ignored',
                                     });
                                   },
                                 ),
