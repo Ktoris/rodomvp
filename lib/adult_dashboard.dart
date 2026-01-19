@@ -390,6 +390,8 @@ class _AdultDashboardState extends State<AdultDashboard> {
                               .get(),
                           builder: (context, teenSnapshot) {
                             String teenName = 'Loading...';
+                            bool hasReviewedTeen = false;
+
                             if (teenSnapshot.hasData &&
                                 teenSnapshot.data!.exists) {
                               final teenData = teenSnapshot.data!.data()
@@ -398,6 +400,11 @@ class _AdultDashboardState extends State<AdultDashboard> {
                                   '${teenData['name'] ?? ''} ${teenData['surname'] ?? ''}'
                                       .trim();
                               if (teenName.isEmpty) teenName = 'Unknown Teen';
+
+                              final reviews =
+                                  (teenData['reviews'] as List<dynamic>?) ?? [];
+                              hasReviewedTeen = reviews
+                                  .any((r) => r['adultId'] == adultId);
                             } else if (teenSnapshot.hasData &&
                                 !teenSnapshot.data!.exists) {
                               teenName = 'Teen not found';
@@ -426,14 +433,27 @@ class _AdultDashboardState extends State<AdultDashboard> {
                                   ),
                                 ),
                               ),
-                              trailing: ElevatedButton(
-                                onPressed: () => _handleLeaveReviewTap(
-                                  context,
-                                  doc.id,
-                                  teenId,
-                                ),
-                                child: const Text('Leave Review'),
-                              ),
+                              trailing:
+                                  (data['reviewed'] == true || hasReviewedTeen)
+                                      ? ElevatedButton(
+                                          onPressed: null, // Disabled
+                                          style: ElevatedButton.styleFrom(
+                                            disabledBackgroundColor:
+                                                Colors.grey.shade300,
+                                            disabledForegroundColor:
+                                                Colors.grey.shade600,
+                                          ),
+                                          child: const Text('Already reviewed'),
+                                        )
+                                      : ElevatedButton(
+                                          onPressed: () =>
+                                              _handleLeaveReviewTap(
+                                            context,
+                                            doc.id,
+                                            teenId,
+                                          ),
+                                          child: const Text('Leave Review'),
+                                        ),
                             );
                           },
                         ),
