@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primaryMint = Color(0xFF2AB090);
+  static const Color primaryBlue = Color(0xFF1976D2);
   static const Color backgroundGrey = Color(0xFFF8F9FA);
 
   static ThemeData get lightTheme {
@@ -9,8 +9,8 @@ class AppTheme {
       useMaterial3: true,
       scaffoldBackgroundColor: backgroundGrey,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryMint,
-        primary: primaryMint,
+        seedColor: primaryBlue,
+        primary: primaryBlue,
         surface: Colors.white,
       ),
 
@@ -46,7 +46,7 @@ class AppTheme {
 
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryMint,
+          backgroundColor: primaryBlue,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

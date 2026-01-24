@@ -21,7 +21,7 @@ class IntroPage extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 64,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryMint, // Using your nice green
+                  color: AppTheme.primaryBlue, // Using your nice green
                   letterSpacing: -2.0,
                 ),
               ),
@@ -85,7 +85,7 @@ class IntroPage extends StatelessWidget {
                     child: Text(
                       'Already have an account? Log In',
                       style: TextStyle(
-                        color: AppTheme.primaryMint,
+                        color: AppTheme.primaryBlue,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
