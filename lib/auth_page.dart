@@ -80,53 +80,173 @@ class _AuthPageState extends State<AuthPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(isLogin ? 'Login' : 'Sign Up')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
-            ),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password'),
-            ),
-            if (!isLogin) ...[
-              const SizedBox(height: 10),
-              DropdownButton<String>(
-                value: role,
-                items: const [
-                  DropdownMenuItem(value: 'teen', child: Text('Teen')),
-                  DropdownMenuItem(value: 'adult', child: Text('Adult')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    role = value!;
-                  });
-                },
-              ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withOpacity(0.05),
+              Colors.white,
             ],
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: submit,
-              child: Text(isLogin ? 'Login' : 'Create Account'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  isLogin = !isLogin;
-                });
-              },
-              child: Text(
-                isLogin ? 'Create an account' : 'Already have an account?',
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 🎨 HEADER
+                  Icon(
+                    Icons.lock_person_rounded,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    isLogin ? 'Welcome Back' : 'Create Account',
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isLogin 
+                        ? 'Sign in to continue to Rodo' 
+                        : 'Join us and start managing tasks',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // 📦 AUTH CARD
+                  Card(
+                    elevation: 4,
+                    shadowColor: Colors.black12,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            controller: emailController,
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                              prefixIcon: Icon(Icons.email_outlined),
+                            ),
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 20),
+                          TextField(
+                            controller: passwordController,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Password',
+                              prefixIcon: Icon(Icons.lock_outline_rounded),
+                            ),
+                          ),
+                          if (!isLogin) ...[
+                            const SizedBox(height: 20),
+                            const Text(
+                              'I am a:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SegmentedButton<String>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: 'teen',
+                                  label: Text('Teen'),
+                                  icon: Icon(Icons.person_outline),
+                                ),
+                                ButtonSegment(
+                                  value: 'adult',
+                                  label: Text('Adult'),
+                                  icon: Icon(Icons.supervisor_account_outlined),
+                                ),
+                              ],
+                              selected: {role},
+                              onSelectionChanged: (Set<String> newSelection) {
+                                setState(() {
+                                  role = newSelection.first;
+                                });
+                              },
+                            ),
+                          ],
+                          const SizedBox(height: 32),
+                          ElevatedButton(
+                            onPressed: submit,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            child: Text(isLogin ? 'Login' : 'Get Started'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 🔄 TOGGLE AUTH MODE
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        isLogin ? "Don't have an account?" : "Already have an account?",
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            isLogin = !isLogin;
+                            error = '';
+                          });
+                        },
+                        child: Text(
+                          isLogin ? 'Sign Up' : 'Log In',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  if (error.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        error,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
-            if (error.isNotEmpty)
-              Text(error, style: const TextStyle(color: Colors.red)),
-          ],
+          ),
         ),
       ),
     );
