@@ -37,10 +37,10 @@ class _StartupRouterState extends State<StartupRouter> {
     }
 
     if (role == 'adult' && user != null) {
-      // 3. Send to AdultDashboard with the UID
+      // 3. Send to RoleRouter to check verification first
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => AdultDashboard(adultId: user.uid)),
+        MaterialPageRoute(builder: (_) => const RoleRouter()),
       );
       return;
     }

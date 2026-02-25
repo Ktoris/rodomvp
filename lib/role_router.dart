@@ -6,6 +6,7 @@ import 'teen_profile_page.dart';
 import 'teen_dashboard.dart';
 import 'adult_profile_page.dart';
 import 'adult_dashboard.dart';
+import 'verify_email_page.dart';
 
 class RoleRouter extends StatelessWidget {
   const RoleRouter({super.key});
@@ -13,6 +14,10 @@ class RoleRouter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
+
+    if (!user.emailVerified) {
+      return const VerifyEmailPage();
+    }
 
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance

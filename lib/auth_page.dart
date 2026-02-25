@@ -61,6 +61,9 @@ class _AuthPageState extends State<AuthPage> {
           'email': emailController.text.trim(),
           'createdAt': FieldValue.serverTimestamp(),
         });
+
+        // 📧 SEND EMAIL VERIFICATION
+        await userCredential.user!.sendEmailVerification();
       }
       if (mounted) {
         Navigator.of(context).pushReplacement(
