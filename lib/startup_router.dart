@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Add this
 
+import 'role_router.dart';
 import 'account_selection_page.dart';
 import 'teen_dashboard.dart';
-import 'adult_dashboard.dart'; // 1. Change the import
 
 class StartupRouter extends StatefulWidget {
   const StartupRouter({super.key});

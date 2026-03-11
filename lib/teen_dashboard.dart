@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 // ✅ IMPORT ADDED
+import 'package:intl/intl.dart';
 import 'chat_page.dart';
 import 'teen_edit_profile_page.dart';
+import 'notifications_page.dart';
+import 'support_page.dart';
+import 'learn_page.dart';
+import 'rules_page.dart';
 
 class TeenDashboard extends StatelessWidget {
   final String teenId;
@@ -24,6 +29,72 @@ class TeenDashboard extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Dashboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Help & Support',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SupportPage()),
+              );
+            },
+          ),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('notifications')
+                .doc(teenId)
+                .collection('items')
+                .where('read', isEqualTo: false)
+                .snapshots(),
+            builder: (context, snapshot) {
+              int unreadCount = 0;
+              if (snapshot.hasData) {
+                unreadCount = snapshot.data!.docs.length;
+              }
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NotificationsPage(uid: teenId),
+                        ),
+                      );
+                    },
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -45,7 +116,7 @@ class TeenDashboard extends StatelessWidget {
             // 🔹 FULL PROFILE VIEW
             StreamBuilder<DocumentSnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('teens')
+                  .collection('users')
                   .doc(teenId)
                   .snapshots(),
               builder: (context, teenSnapshot) {
@@ -65,30 +136,153 @@ class TeenDashboard extends StatelessWidget {
                             0) as num)
                         .toInt();
 
+                final stats = teenData['stats'] ?? {};
+                final int jobsDone = (stats['jobsDone'] ?? 0) as int;
+                final int totalEarned = (stats['totalEarned'] ?? 0) as int;
+                final int lessonsCompleted = (stats['lessonsCompleted'] ?? 0) as int;
+                final int repeatHires = (stats['repeatHires'] ?? 0) as int;
+                final badges = List<String>.from(teenData['badges'] ?? []);
+                final portfolio = List<String>.from(teenData['portfolio'] ?? []);
+
+                // 🔹 RULES AGREEMENT CHECK
+                final agreedData = teenData['agreedToRules'] as Map<String, dynamic>?;
+                final bool hasAgreed = agreedData != null && agreedData['agreed'] == true;
+
+                if (!hasAgreed) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RulesPage(uid: teenId, isOnboarding: true),
+                      ),
+                    );
+                  });
+                  return const Scaffold(
+                    body: Center(
+                      child: Text('Please review community guidelines...'),
+                    ),
+                  );
+                }
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 🔹 HEADER: Name and Rating
-                    Text(
-                      '${teenData['name'] ?? ''} ${teenData['surname'] ?? ''}',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                    // 🔹 HEADER CARD
+                    Center(
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundImage: teenData['profilePhotoUrl'] != null
+                                ? NetworkImage(teenData['profilePhotoUrl'])
+                                : null,
+                            child: teenData['profilePhotoUrl'] == null
+                                ? const Icon(Icons.person, size: 50)
+                                : null,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '${teenData['name'] ?? ''} ${teenData['surname'] ?? ''}',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (teenData['age'] != null && teenData['city'] != null)
+                            Text(
+                              '${teenData['age']} yrs • ${teenData['city']}',
+                              style: const TextStyle(fontSize: 16, color: Colors.grey),
+                            ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _StarRating(rating: rating),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${rating.toStringAsFixed(1)} ★ ($reviewCount)',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (repeatHires > 0) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '✔ $repeatHires people would hire again',
+                              style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          if (teenData['hourlyRate'] != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '\$${teenData['hourlyRate']}/hr',
+                                style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 24),
+
+                    // 🔹 ACTION CARDS
                     Row(
                       children: [
-                        _StarRating(rating: rating),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${rating.toStringAsFixed(1)} ★ ($reviewCount)',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
+                        Expanded(
+                          child: _ActionCard(
+                            icon: Icons.school,
+                            title: 'Learn',
+                            subtitle: 'Earn XP & Skills',
+                            color: Colors.orange,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => LearnPage(teenId: teenId),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ActionCard(
+                            icon: Icons.edit,
+                            title: 'Profile',
+                            subtitle: 'Update Bio',
+                            color: Colors.blue,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TeenEditProfilePage(teenId: teenId),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 🔹 PERFORMANCE METRICS STRIP (Horizontal Scroll)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _MetricCard(icon: Icons.check_circle_outline, title: 'Jobs Done', value: '$jobsDone'),
+                          _MetricCard(icon: Icons.attach_money, title: 'Earned', value: '\$${(totalEarned / 100).toStringAsFixed(2)}'),
+                          _MetricCard(icon: Icons.menu_book, title: 'Lessons', value: '$lessonsCompleted'),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 24),
 
@@ -111,31 +305,6 @@ class TeenDashboard extends StatelessWidget {
                                   backgroundColor: Colors.blue.shade50,
                                 ))
                             .toList(),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-
-                    // 🔹 QUALIFICATIONS
-                    if (teenData['qualifications']?.toString().isNotEmpty ?? false) ...[
-                      const Text(
-                        'Qualifications',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          teenData['qualifications'],
-                          style: const TextStyle(fontSize: 14),
-                        ),
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -165,6 +334,90 @@ class TeenDashboard extends StatelessWidget {
                       const SizedBox(height: 24),
                     ],
 
+                    // 🔹 PORTFOLIO / GALLERY
+                    if (portfolio.isNotEmpty) ...[
+                      const Text(
+                        'Portfolio',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 120,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: portfolio.length,
+                          itemBuilder: (context, index) {
+                            return Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              width: 120,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                image: DecorationImage(
+                                  image: NetworkImage(portfolio[index]),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // 🔹 BADGES SECTION
+                    const Text(
+                        'Badges',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (badges.isEmpty)
+                        const Text('No badges earned yet. Keep it up!', style: TextStyle(color: Colors.grey, fontSize: 14))
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: badges.map((badgeId) {
+                            return StreamBuilder<DocumentSnapshot>(
+                              stream: FirebaseFirestore.instance.collection('badges').doc(badgeId).snapshots(),
+                              builder: (context, badgeSnap) {
+                                if (!badgeSnap.hasData) return const SizedBox();
+                                final badgeData = badgeSnap.data!.data() as Map<String, dynamic>?;
+                                if (badgeData == null) return Chip(label: Text(badgeId));
+
+                                final name = badgeData['name'] ?? badgeId;
+                                final description = badgeData['description'] ?? '';
+                                final iconName = badgeData['icon'] ?? 'stars';
+
+                                // Map string icon names to Material Icons
+                                final iconMap = {
+                                  'stars': Icons.stars,
+                                  'thumb_up': Icons.thumb_up,
+                                  'workspace_premium': Icons.workspace_premium,
+                                  'verified': Icons.verified,
+                                  'school': Icons.school,
+                                  'auto_stories': Icons.auto_stories,
+                                };
+
+                                return Tooltip(
+                                  message: description,
+                                  child: Chip(
+                                    avatar: Icon(iconMap[iconName] ?? Icons.stars, color: Colors.amber, size: 18),
+                                    label: Text(name),
+                                    backgroundColor: Colors.amber.shade50,
+                                    side: BorderSide(color: Colors.amber.shade200),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 24),
                     // 🔹 REVIEWS SECTION
                     Text(
                       'Reviews ($reviewCount)',
@@ -201,7 +454,7 @@ class TeenDashboard extends StatelessWidget {
                         });
 
                         return Column(
-                          children: sortedReviews.map((reviewData) {
+                          children: sortedReviews.take(3).map((reviewData) { // Display top 3 reviews
                             final reviewRating =
                                 (reviewData['rating'] ?? 0).toDouble();
                             final reviewComment =
@@ -251,7 +504,7 @@ class TeenDashboard extends StatelessWidget {
                             if (reviewComment.isNotEmpty) {
                               children.addAll([
                                 const SizedBox(height: 8),
-                                Text(reviewComment),
+                                Text('"$reviewComment"', style: const TextStyle(fontStyle: FontStyle.italic)),
                               ]);
                             }
 
@@ -271,10 +524,47 @@ class TeenDashboard extends StatelessWidget {
                         );
                       },
                     ),
-                  ],
-                );
-              },
-            ),
+                    const SizedBox(height: 24),
+
+                    // 🔹 ACTION CARDS
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ActionCard(
+                            icon: Icons.school,
+                            title: 'Learn',
+                            subtitle: 'Earn XP & Skills',
+                            color: Colors.orange,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => LearnPage(teenId: teenId),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ActionCard(
+                            icon: Icons.edit,
+                            title: 'Profile',
+                            subtitle: 'Update Bio',
+                            color: Colors.blue,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TeenEditProfilePage(teenId: teenId),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
 
             // 🔹 PENDING REQUESTS
             const Text(
@@ -284,7 +574,9 @@ class TeenDashboard extends StatelessWidget {
             const SizedBox(height: 8),
 
             StreamBuilder<QuerySnapshot>(
-              stream: pendingRequests.snapshots(),
+              stream: pendingRequests
+                  .where('status', isEqualTo: 'pending')
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -334,13 +626,37 @@ class TeenDashboard extends StatelessWidget {
                             Text(
                               data['locationType'] == 'remote'
                                   ? 'Remote'
-                                  : 'Location: ${data['locationText']}',
+                                  : 'Location: ${data['locationText'] ?? "Not specified"}',
+                            ),
+                            if (data['locationData'] != null) ...[
+                              Text(
+                                'Address: ${data['locationData']['address']}',
+                                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                              ),
+                              TextButton.icon(
+                                onPressed: () => _openMapDialog(context, data['locationData']),
+                                icon: const Icon(Icons.map, size: 16),
+                                label: const Text('View on Map', style: TextStyle(fontSize: 12)),
+                                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 30)),
+                              ),
+                            ],
+
+                            Text(
+                              data['date'] != null
+                                  ? 'Date: ${_formatDate(data['date'])}'
+                                  : 'Date: Anytime',
                             ),
 
                             Text(
-                              data['dateType'] == 'anytime'
-                                  ? 'Anytime'
-                                  : 'From ${_formatDate(data['startDate'])} to ${_formatDate(data['endDate'])}',
+                              'Duration: ${data['duration'] ?? "Not specified"}',
+                            ),
+
+                            Text(
+                              'Pay: \$${data['budget'] ?? 0}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
                             ),
 
                             const SizedBox(height: 10),
@@ -379,11 +695,7 @@ class TeenDashboard extends StatelessWidget {
                                     color: Colors.red,
                                   ),
                                   tooltip: 'Ignore',
-                                  onPressed: () {
-                                    doc.reference.update({
-                                      'status': 'ignored',
-                                    });
-                                  },
+                                  onPressed: () => _ignoreJob(doc.id),
                                 ),
                               ],
                             ),
@@ -395,8 +707,15 @@ class TeenDashboard extends StatelessWidget {
                 );
               },
             ),
-
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => _showIgnoredOffers(context),
+                icon: const Icon(Icons.archive_outlined, size: 18),
+                label: const Text('View Ignored Offers'),
+              ),
+            ),
+            const SizedBox(height: 24),
 
             // 🔹 ACCEPTED JOBS
             const Text(
@@ -445,9 +764,49 @@ class TeenDashboard extends StatelessWidget {
                             Text(data['jobDescription'] ?? ''),
                             const SizedBox(height: 6),
                             Text(
-                              'Working for ${data['adultName']}',
+                              data['locationType'] == 'remote'
+                                  ? 'Remote'
+                                  : 'Location: ${data['locationText'] ?? "Not specified"}',
+                            ),
+                            if (data['locationData'] != null) ...[
+                              Text(
+                                'Address: ${data['locationData']['address']}',
+                                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                              ),
+                              TextButton.icon(
+                                onPressed: () => _openMapDialog(context, data['locationData']),
+                                icon: const Icon(Icons.map, size: 16),
+                                label: const Text('View on Map', style: TextStyle(fontSize: 12)),
+                                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 30)),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            ElevatedButton.icon(
+                              onPressed: () {}, // Simulation: would open external maps
+                              icon: const Icon(Icons.directions, size: 18),
+                              label: const Text('Get Directions'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.blue,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                              ),
+                            ),
+
+                            Text(
+                              data['date'] != null
+                                  ? 'Date: ${_formatDate(data['date'])}'
+                                  : 'Date: Anytime',
+                            ),
+
+                            Text(
+                              'Duration: ${data['duration'] ?? "Not specified"}',
+                            ),
+
+                            Text(
+                              'Pay: \$${data['budget'] ?? 0}',
                               style: const TextStyle(
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
                               ),
                             ),
 
@@ -494,7 +853,139 @@ class TeenDashboard extends StatelessWidget {
               },
             ),
           ],
+        );
+              },
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _ignoreJob(String docId) async {
+    await FirebaseFirestore.instance
+        .collection('hire_requests')
+        .doc(docId)
+        .update({
+      'status': 'ignored',
+      'ignoredAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  void _showIgnoredOffers(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text(
+                    'Ignored Offers',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('hire_requests')
+                        .where('teenId', isEqualTo: teenId)
+                        .where('status', isEqualTo: 'ignored')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                      if (snapshot.data!.docs.isEmpty) {
+                        return const Center(
+                          child: Text('No ignored offers', style: TextStyle(color: Colors.grey)),
+                        );
+                      }
+
+                      return ListView(
+                        controller: scrollController,
+                        children: snapshot.data!.docs.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final ignoredAt = data['ignoredAt'] as Timestamp?;
+                          final bool canUnignore = ignoredAt != null &&
+                              DateTime.now().difference(ignoredAt.toDate()).inHours < 24;
+
+                          return ListTile(
+                            title: Text(data['jobTitle'] ?? 'Job'),
+                            subtitle: Text('From: ${data['adultName']}\nIgnored: ${ignoredAt != null ? _formatDate(ignoredAt) : "Unknown"}'),
+                            isThreeLine: true,
+                            trailing: canUnignore
+                                ? TextButton(
+                                    onPressed: () {
+                                      doc.reference.update({'status': 'pending'});
+                                      Navigator.pop(context);
+                                    },
+                                    child: const Text('Restore'),
+                                  )
+                                : const Text('Expired', style: TextStyle(color: Colors.red, fontSize: 12)),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openMapDialog(BuildContext context, Map<String, dynamic> location) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Job Location'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 150,
+              width: double.infinity,
+              color: Colors.blue.shade100,
+              child: const Icon(Icons.map, size: 80, color: Colors.blue),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              location['address'] ?? 'Specific Address',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              'Lat: ${location['lat']?.toStringAsFixed(4)}, Lng: ${location['lng']?.toStringAsFixed(4)}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
@@ -526,6 +1017,79 @@ class _StarRating extends StatelessWidget {
           return const Icon(Icons.star_border, size: 20, color: Colors.amber);
         }
       }),
+    );
+  }
+}
+
+// 🔹 Action Card for Teen Dashboard
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// 🔹 Metric Card for Profile Strip
+class _MetricCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+
+  const _MetricCard({required this.icon, required this.title, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 100,
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade100),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.blue.shade700),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
+      ),
     );
   }
 }
