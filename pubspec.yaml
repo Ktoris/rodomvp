@@ -38,6 +38,7 @@ dependencies:
   cloud_firestore: ^5.4.0
 
   shared_preferences: ^2.2.3
+  intl: ^0.20.2
 
 
 

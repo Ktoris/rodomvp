@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:rodo_mvp/auth_page.dart';
 import 'package:rodo_mvp/role_router.dart';
@@ -19,6 +20,14 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     if (user != null) {
       await user.reload();
       if (user.emailVerified) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          final role = doc.data()?['role'];
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+            'verified': true,
+            'accountStatus': role == 'teen' ? 'pending_parent' : 'active',
+          });
+        }
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const RoleRouter()),

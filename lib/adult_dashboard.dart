@@ -301,17 +301,33 @@ class _AdultDashboardState extends State<AdultDashboard> {
                   final teenDocs = teenSnapshot.data!.docs;
                   if (teenDocs.isEmpty) return const Text('No teens available');
 
+                  final bool hasActiveFilters = _searchQuery.isNotEmpty || 
+                                              _selectedSkills.isNotEmpty || 
+                                              _minRating > 0 || 
+                                              _minAge > 13 || 
+                                              _maxAge < 17 || 
+                                              _remoteOnly;
+
                   final filteredTeens = teenDocs.where((teen) {
                     final data = teen.data() as Map<String, dynamic>;
                     
+                    // Allow test accounts without status, but if status exists it must be active (or pending for testing)
+                    // If you strictly want ONLY 'active', you can enforce it, but for a foolproof MVP it's often better to check if it's explicitly suspended
+                    if (data['accountStatus'] == 'suspended') return false;
+
+                    if (!hasActiveFilters) {
+                      return true;
+                    }
+
                     // Basic search (keyword in skills or name)
                     final name = '${data['name'] ?? ''} ${data['surname'] ?? ''}'.toLowerCase();
                     final skills = List<String>.from(data['skills'] ?? []).map((s) => s.toLowerCase()).toList();
                     
-                    bool matchesSearch = _searchQuery.isEmpty || 
-                                        name.contains(_searchQuery) || 
-                                        skills.any((s) => s.contains(_searchQuery));
-                    if (!matchesSearch) return false;
+                    if (_searchQuery.isNotEmpty) {
+                      bool matchesSearch = name.contains(_searchQuery) || 
+                                          skills.any((s) => s.contains(_searchQuery));
+                      if (!matchesSearch) return false;
+                    }
 
                     // Skill filters (exact match or list inclusion)
                     if (_selectedSkills.isNotEmpty) {
@@ -319,19 +335,24 @@ class _AdultDashboardState extends State<AdultDashboard> {
                     }
 
                     // Rating filter
-                    final double rating = (data['avgRating'] ?? data['rating'] ?? 0).toDouble();
-                    if (rating < _minRating) return false;
+                    if (_minRating > 0) {
+                      final double rating = (data['avgRating'] ?? data['rating'] ?? 0).toDouble();
+                      if (rating < _minRating) return false;
+                    }
 
                     // Age filter
-                    final int age = (data['age'] ?? 0) as int;
-                    if (age < _minAge || age > _maxAge) return false;
+                    if (_minAge > 13 || _maxAge < 17) {
+                      // Handle age carefully (might be string or int)
+                      final int age = int.tryParse(data['age']?.toString() ?? '0') ?? 0;
+                      if (age > 0 && (age < _minAge || age > _maxAge)) return false;
+                      if (age == 0) return false; // Hide unknown ages if actively filtering by age
+                    }
 
                     // Remote filter
-                    final bool isRemote = data['workRemote'] ?? false;
-                    if (_remoteOnly && !isRemote) return false;
-
-                    // Account status filter (Only active)
-                    if (data['accountStatus'] != 'active') return false;
+                    if (_remoteOnly) {
+                      final bool isRemote = data['workRemote'] ?? false;
+                      if (!isRemote) return false;
+                    }
 
                     return true;
                   }).toList();

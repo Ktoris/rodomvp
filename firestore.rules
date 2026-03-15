@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Core user check functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      // Authenticated users can read valid profiles
+      allow read: if isAuthenticated();
+      
+      // Users can only write/update their own document
+      // Note: A strict enforcement would restrict specific fields (stats, discoveryScore, etc.)
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) && 
+        (!request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['stats', 'badges', 'discoveryScore', 'accountStatus', 'topReviews'])); // Prevent clients from modifying protected fields
+      allow delete: if false; // Only admin/backend can delete
+    }
+
+    match /jobs/{jobId} {
+      // Adults can read their own created jobs, Teens can read jobs they are offered
+      allow read: if isAuthenticated() && 
+        (resource.data.adultUid == request.auth.uid || 
+         request.auth.uid in resource.data.teenUids);
+      
+      allow create: if isAuthenticated(); // Check role conceptually
+      allow update: if isAuthenticated(); // Both parties need to confirm completion
+      allow delete: if false;
+    }
+
+    match /reviews/{jobId} {
+      // Anyone authenticated can read reviews
+      allow read: if isAuthenticated();
+      // Can only write if reviewerUid matches
+      allow create: if isAuthenticated() && request.resource.data.reviewerUid == request.auth.uid;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /chats/{chatId} {
+      // Read/write only if participant (can be checked if chatId contains uid)
+      allow read, write: if isAuthenticated() && chatId.matches('.*' + request.auth.uid + '.*');
+      
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    match /notifications/{uid}/items/{notifId} {
+      allow read, update: if isOwner(uid);
+      allow create, delete: if false; // Server created
+    }
+
+    match /parentApprovals/{tokenId} {
+       allow read: if false;
+       allow write: if false; // All backend
+    }
+
+    match /support/{ticketId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+    
+    match /lessonProgress/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+  }
+}

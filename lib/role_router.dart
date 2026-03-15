@@ -7,6 +7,7 @@ import 'teen_dashboard.dart';
 import 'adult_profile_page.dart';
 import 'adult_dashboard.dart';
 import 'verify_email_page.dart';
+import 'pending_parent_page.dart';
 
 class RoleRouter extends StatelessWidget {
   const RoleRouter({super.key});
@@ -15,9 +16,10 @@ class RoleRouter extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
 
-    if (!user.emailVerified) {
-      return const VerifyEmailPage();
-    }
+    // 🔒 EMAIL VERIFICATION DISABLED — uncomment to re-enable
+    // if (!user.emailVerified) {
+    //   return const VerifyEmailPage();
+    // }
 
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance
@@ -31,56 +33,29 @@ class RoleRouter extends StatelessWidget {
           );
         }
 
-        final role = snapshot.data!['role'];
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final role = data['role'];
+        final accountStatus = data.containsKey('accountStatus') ? data['accountStatus'] : null;
+
+        // 🔒 GUARDIAN APPROVAL DISABLED — uncomment to re-enable
+        // if (role == 'teen' && accountStatus == 'pending_parent') {
+        //   return const PendingParentPage();
+        // }
 
         // 🔹 TEEN FLOW
         if (role == 'teen') {
-          return FutureBuilder<DocumentSnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('teens')
-                .doc(user.uid)
-                .get(),
-            builder: (context, teenSnapshot) {
-              if (!teenSnapshot.hasData) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (teenSnapshot.data!.exists) {
-                // Teen has profile → go to dashboard
-                return TeenDashboard(teenId: user.uid);
-              }
-
-              // Teen has no profile → create profile
-              return const TeenProfilePage();
-            },
-          );
+          if (data.containsKey('name')) {
+            return TeenDashboard(teenId: user.uid);
+          }
+          return const TeenProfilePage();
         }
 
         // 🔹 ADULT FLOW
         if (role == 'adult') {
-          return FutureBuilder<DocumentSnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('adults')
-                .doc(user.uid)
-                .get(),
-            builder: (context, adultSnapshot) {
-              if (!adultSnapshot.hasData) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (adultSnapshot.data!.exists) {
-                // Adult has profile → go to dashboard
-                return AdultDashboard(adultId: user.uid);
-              }
-
-              // Adult has no profile → create profile
-              return const AdultProfilePage();
-            },
-          );
+          if (data.containsKey('name')) {
+            return AdultDashboard(adultId: user.uid);
+          }
+          return const AdultProfilePage();
         }
 
         // 🔹 Fallback for unknown role

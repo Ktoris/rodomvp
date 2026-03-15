@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'teen_dashboard.dart';
+import 'availability_calendar.dart';
 
 class TeenProfilePage extends StatefulWidget {
   const TeenProfilePage({super.key});
@@ -14,20 +15,13 @@ class TeenProfilePage extends StatefulWidget {
 class _TeenProfilePageState extends State<TeenProfilePage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController surnameController = TextEditingController();
-  final TextEditingController qualificationsController =
-      TextEditingController();
+  final TextEditingController ageController = TextEditingController();
+  final TextEditingController cityController = TextEditingController();
+  final TextEditingController hourlyRateController = TextEditingController();
   final TextEditingController bioController = TextEditingController();
   final TextEditingController skillInputController = TextEditingController();
 
-  // 🔹 Structured availability (for filtering later)
-  final List<String> availabilityOptions = [
-    'Weekdays',
-    'Weekends',
-    'Evenings',
-    'Anytime',
-  ];
   final Set<String> selectedAvailability = {};
-
   final Set<String> selectedSkills = {};
 
   void _addSkillFromInput([String? value]) {
@@ -42,7 +36,13 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
 
   Future<void> saveProfile() async {
     if (nameController.text.isEmpty ||
-        surnameController.text.isEmpty) {
+        surnameController.text.isEmpty ||
+        ageController.text.isEmpty ||
+        cityController.text.isEmpty ||
+        hourlyRateController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all required fields')),
+      );
       return;
     }
 
@@ -55,21 +55,35 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
 
     final user = FirebaseAuth.instance.currentUser!;
     final uid = user.uid;
+    final age = int.tryParse(ageController.text.trim()) ?? 13;
+    final rate = double.tryParse(hourlyRateController.text.trim()) ?? 10.0;
 
-    await FirebaseFirestore.instance.collection('teens').doc(uid).set({
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
       'name': nameController.text.trim(),
       'surname': surnameController.text.trim(),
-      'qualifications': qualificationsController.text.trim(),
+      'displayName': '${nameController.text.trim()} ${surnameController.text.trim()}',
+      'age': age,
+      'city': cityController.text.trim(),
+      'hourlyRate': rate,
       'bio': bioController.text.trim(),
       'availability': selectedAvailability.toList(),
       'skills': selectedSkills.toList(),
-      // unified rating fields for reviews
       'avgRating': 0.0,
       'reviewCount': 0,
-      'reviews': [], // Initialize empty reviews array
-      'profilePhotoUrl': null, // later
+      'reviews': [], 
+      'profilePhotoUrl': null, 
+      'portfolio': [],
+      'stats': {
+        'jobsDone': 0,
+        'totalEarned': 0,
+        'lessonsCompleted': 0,
+        'repeatHires': 0,
+        'avgRating': 0.0,
+        'totalReviews': 0
+      },
+      'badges': [],
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
 
     if (!mounted) return;
 
@@ -86,7 +100,7 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
     final uid = FirebaseAuth.instance.currentUser!.uid;
 
     return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection('teens').doc(uid).get(),
+      future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Scaffold(
@@ -94,8 +108,8 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
           );
         }
 
-        // 🚫 Profile already exists → skip creation
-        if (snapshot.data!.exists) {
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+        if (data != null && data.containsKey('name')) {
           return TeenDashboard(teenId: uid);
         }
 
@@ -106,66 +120,66 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🔹 BASIC INFO
+                const Text('Tell us about yourself!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: const InputDecoration(labelText: 'First Name *'),
                 ),
                 TextField(
                   controller: surnameController,
-                  decoration: const InputDecoration(labelText: 'Surname'),
+                  decoration: const InputDecoration(labelText: 'Last Name *'),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: ageController,
+                        decoration: const InputDecoration(labelText: 'Age *'),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextField(
+                        controller: hourlyRateController,
+                        decoration: const InputDecoration(labelText: 'Hourly Rate (\$) *'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                  ],
                 ),
                 TextField(
-                  controller: qualificationsController,
-                  decoration:
-                      const InputDecoration(labelText: 'Qualifications'),
+                  controller: cityController,
+                  decoration: const InputDecoration(labelText: 'City * (e.g. Austin, TX)'),
                 ),
 
                 const SizedBox(height: 16),
-
-                // 🔹 BIO
                 TextField(
                   controller: bioController,
                   maxLines: 3,
                   decoration: const InputDecoration(
                     labelText: 'Bio',
-                    hintText: 'Tell adults a bit about yourself',
+                    hintText: 'Tell adults a bit about yourself, your goals, and why you are a great hire.',
                   ),
                 ),
 
                 const SizedBox(height: 20),
-
-                // 🔹 AVAILABILITY
-                const Text(
-                  'Availability',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Wrap(
-                  spacing: 8,
-                  children: availabilityOptions.map((option) {
-                    final selected =
-                        selectedAvailability.contains(option);
-                    return FilterChip(
-                      label: Text(option),
-                      selected: selected,
-                      onSelected: (value) {
-                        setState(() {
-                          value
-                              ? selectedAvailability.add(option)
-                              : selectedAvailability.remove(option);
-                        });
-                      },
-                    );
-                  }).toList(),
+                const Text('Availability', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                AvailabilityCalendar(
+                  selectedSlots: selectedAvailability,
+                  onChanged: (newSlots) {
+                    setState(() {
+                      selectedAvailability.clear();
+                      selectedAvailability.addAll(newSlots);
+                    });
+                  },
                 ),
 
                 const SizedBox(height: 20),
-
-                // 🔹 SKILLS (free text tags)
-                const Text(
-                  'Skills',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                const Text('Skills', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -174,8 +188,7 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
                         controller: skillInputController,
                         decoration: const InputDecoration(
                           labelText: 'Add a skill',
-                          hintText:
-                              'Example: Dog walking, Computer Repairing (one skill at a time)',
+                          hintText: 'Example: Dog walking',
                         ),
                         textInputAction: TextInputAction.done,
                         onSubmitted: _addSkillFromInput,
@@ -189,7 +202,6 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
                   children: selectedSkills.map((skill) {
@@ -197,22 +209,24 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
                       label: Text(skill),
                       deleteIcon: const Icon(Icons.close, size: 16),
                       onDeleted: () {
-                        setState(() {
-                          selectedSkills.remove(skill);
-                        });
+                        setState(() => selectedSkills.remove(skill));
                       },
                     );
                   }).toList(),
                 ),
 
                 const SizedBox(height: 30),
-
                 Center(
                   child: ElevatedButton(
                     onPressed: saveProfile,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
                     child: const Text('Save Profile'),
                   ),
                 ),
+                const SizedBox(height: 40),
               ],
             ),
           ),

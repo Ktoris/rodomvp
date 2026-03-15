@@ -19,10 +19,11 @@ class _AdultProfilePageState extends State<AdultProfilePage> {
 
     final uid = FirebaseAuth.instance.currentUser!.uid;
 
-    await FirebaseFirestore.instance.collection('adults').doc(uid).set({
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
       'name': nameController.text.trim(),
+      'displayName': nameController.text.trim(),
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
 
     if (!mounted) return;
 
@@ -37,7 +38,7 @@ class _AdultProfilePageState extends State<AdultProfilePage> {
     final uid = FirebaseAuth.instance.currentUser!.uid;
 
     return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection('adults').doc(uid).get(),
+      future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Scaffold(
@@ -46,7 +47,8 @@ class _AdultProfilePageState extends State<AdultProfilePage> {
         }
 
         // 🚫 Profile already exists → skip setup forever
-        if (snapshot.data!.exists) {
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+        if (data != null && data.containsKey('name')) {
           return AdultDashboard(adultId: uid);
         }
 

@@ -13,6 +13,7 @@ class AuthPage extends StatefulWidget {
 class _AuthPageState extends State<AuthPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final parentEmailController = TextEditingController();
 
   String role = 'teen'; // teen or adult
   bool isLogin = true;
@@ -59,11 +60,14 @@ class _AuthPageState extends State<AuthPage> {
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
           'role': role,
           'email': emailController.text.trim(),
+          'verified': false,
+          'accountStatus': 'active', // was 'pending_email' — changed while email verification is disabled
+          // if (role == 'teen') 'parentEmail': parentEmailController.text.trim(), // 🔒 GUARDIAN DISABLED
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // 📧 SEND EMAIL VERIFICATION
-        await userCredential.user!.sendEmailVerification();
+        // 📧 EMAIL VERIFICATION DISABLED — uncomment to re-enable
+        // await userCredential.user!.sendEmailVerification();
       }
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -185,6 +189,18 @@ class _AuthPageState extends State<AuthPage> {
                                 });
                               },
                             ),
+                            // 🔒 GUARDIAN EMAIL FIELD DISABLED — uncomment to re-enable
+                            // if (role == 'teen') ...[
+                            //   const SizedBox(height: 20),
+                            //   TextField(
+                            //     controller: parentEmailController,
+                            //     decoration: const InputDecoration(
+                            //       labelText: 'Parent/Guardian Email',
+                            //       prefixIcon: Icon(Icons.family_restroom),
+                            //     ),
+                            //     keyboardType: TextInputType.emailAddress,
+                            //   ),
+                            // ],
                           ],
                           const SizedBox(height: 32),
                           ElevatedButton(
