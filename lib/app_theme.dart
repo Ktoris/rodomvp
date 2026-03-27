@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 
 class AppTheme {
-  static const Color primaryBlue = Color(0xFF1976D2);
-  static const Color backgroundGrey = Color(0xFFF8F9FA);
+  static const Color darkBlue = Color(0xFF003366);
+  static const Color teal = Color(0xFF008080);
+  static const Color accentOrange = Color(0xFFFF8C00);
+  static const Color backgroundGrey = Color(0xFFF9F9FE);
 
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: backgroundGrey,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryBlue,
-        primary: primaryBlue,
+        seedColor: darkBlue,
+        primary: darkBlue,
+        secondary: teal,
+        tertiary: accentOrange,
         surface: Colors.white,
       ),
+      textTheme: GoogleFonts.plusJakartaSansTextTheme(),
 
       // FIX: Changed CardTheme to CardThemeData
       cardTheme: CardThemeData(
@@ -46,10 +53,11 @@ class AppTheme {
 
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryBlue,
+          backgroundColor: darkBlue,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         ),
       ),
       
@@ -67,7 +75,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: primaryBlue, width: 2),
+          borderSide: const BorderSide(color: darkBlue, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
