@@ -70,9 +70,8 @@ class _AuthPageState extends State<AuthPage> {
         // await userCredential.user!.sendEmailVerification();
       }
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const RoleRouter()),
-        );
+        // Removed manual navigation to RoleRouter. 
+        // main.dart's StreamBuilder will catch the auth state change and show RoleRouter.
       }
     } catch (e) {
       setState(() {

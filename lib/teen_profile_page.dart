@@ -23,6 +23,7 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
 
   final Set<String> selectedAvailability = {};
   final Set<String> selectedSkills = {};
+  bool isSaving = false;
 
   void _addSkillFromInput([String? value]) {
     final raw = (value ?? skillInputController.text).trim();
@@ -58,23 +59,34 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
     final age = int.tryParse(ageController.text.trim()) ?? 13;
     final rate = double.tryParse(hourlyRateController.text.trim()) ?? 10.0;
 
-    await FirebaseFirestore.instance.collection('users').doc(uid).set({
-      'name': nameController.text.trim(),
-      'surname': surnameController.text.trim(),
-      'displayName': '${nameController.text.trim()} ${surnameController.text.trim()}',
-      'age': age,
-      'city': cityController.text.trim(),
-      'hourlyRate': rate,
-      'bio': bioController.text.trim(),
-      'availability': selectedAvailability.toList(),
-      'skills': selectedSkills.toList(),
-      'avgRating': 0.0,
-      'reviewCount': 0,
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    setState(() => isSaving = true);
+    
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'name': nameController.text.trim(),
+        'surname': surnameController.text.trim(),
+        'displayName': '${nameController.text.trim()} ${surnameController.text.trim()}',
+        'age': age,
+        'city': cityController.text.trim(),
+        'hourlyRate': rate,
+        'bio': bioController.text.trim(),
+        'availability': selectedAvailability.toList(),
+        'skills': selectedSkills.toList(),
+        'avgRating': 0.0,
+        'reviewCount': 0,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
-    if (!mounted) return;
-    // Note: Manual navigation removed. RoleRouter now handles the transition reactively.
+      if (!mounted) return;
+      // RoleRouter in main.dart will react to the name change.
+    } catch (e) {
+      if (mounted) {
+        setState(() => isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving profile: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -184,12 +196,19 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
             const SizedBox(height: 30),
             Center(
               child: ElevatedButton(
-                onPressed: saveProfile,
+                onPressed: isSaving ? null : saveProfile,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                   textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  minimumSize: const Size(200, 50),
                 ),
-                child: const Text('Save Profile'),
+                child: isSaving 
+                  ? const SizedBox(
+                      width: 20, 
+                      height: 20, 
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                    )
+                  : const Text('Save Profile'),
               ),
             ),
             const SizedBox(height: 40),
