@@ -236,13 +236,16 @@ class _AdultDashboardState extends State<AdultDashboard> {
                 );
               }
 
+              // 📱 RESPONSIVE GRID: 2 per row on mobile, 4 per row on desktop
+              final isMobile = MediaQuery.of(context).size.width < 700;
+
               return GridView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: isMobile ? 2 : 4,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  childAspectRatio: 0.92, // ← Clips neatly just below "View Profile" button
+                  childAspectRatio: 1.0,
                 ),
                 itemCount: filteredDocs.length,
                 itemBuilder: (context, index) {
@@ -399,101 +402,107 @@ class _AdultDashboardState extends State<AdultDashboard> {
     final String initials = (name.isNotEmpty ? name[0] : '') + (surname.isNotEmpty ? surname[0] : '');
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.black.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.01),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min, // ← Keeps column as tight as content allows
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
+                  color: AppTheme.teal.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
                     initials,
                     style: GoogleFonts.plusJakartaSans(
-                      color: Colors.blue,
+                      color: AppTheme.teal,
                       fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                      fontSize: 13,
                     ),
                   ),
                 ),
               ),
               const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.star_rounded, color: Colors.orange, size: 14),
+                    const SizedBox(width: 2),
+                    Text(
+                      rating.toStringAsFixed(1),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800, 
+                        color: AppTheme.darkBlue,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$name $surname',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: AppTheme.darkBlue,
+                ),
+              ),
+              Text(
+                '$age years old',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: Colors.black38,
+                ),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.star_rounded, color: Colors.orange, size: 16),
-                  const SizedBox(width: 2),
+                  const Icon(Icons.location_on_rounded, color: Colors.blue, size: 12),
+                  const SizedBox(width: 4),
                   Text(
-                    rating.toStringAsFixed(1),
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w800, 
-                      color: AppTheme.darkBlue,
-                      fontSize: 13,
-                    ),
+                    data['city'] ?? 'NYC',
+                    style: GoogleFonts.plusJakartaSans(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 6), // gap after avatar row
-          Text(
-            '$name $surname, $age',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.plusJakartaSans(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: AppTheme.darkBlue,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined, color: Colors.black26, size: 12),
-              const SizedBox(width: 3),
-              Expanded(
-                child: Text(
-                  data['city'] ?? 'NYC',
-                  style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontSize: 11, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              const Icon(Icons.access_time_outlined, color: Colors.black26, size: 12),
-              const SizedBox(width: 3),
-              Expanded(
-                child: Text(
-                  'Weekends',
-                  style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontSize: 11, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: skills.take(2).map((s) => _buildModernChip(s)).toList(),
-          ),
-          const SizedBox(height: 8),
+
           SizedBox(
             width: double.infinity,
-            height: 32, // compact button
+            height: 40,
             child: ElevatedButton(
               onPressed: () {
                 Navigator.push(
@@ -504,11 +513,10 @@ class _AdultDashboardState extends State<AdultDashboard> {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: Colors.blue.shade400,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: EdgeInsets.zero,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: Text('View Profile', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w800)),
             ),
