@@ -55,11 +55,6 @@ class RoleRouter extends StatelessWidget {
 
         final doc = snapshot.data!;
         
-        // 🔒 EMAIL VERIFICATION GATE
-        if (!user.emailVerified) {
-          return const VerifyEmailPage();
-        }
-
         if (!doc.exists) {
           return const Scaffold(
             body: Center(child: Text('User record not found')),
