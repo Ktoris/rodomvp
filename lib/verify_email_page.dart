@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:rodo_mvp/auth_page.dart';
-import 'package:rodo_mvp/role_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'app_theme.dart';
 
 class VerifyEmailPage extends StatefulWidget {
   const VerifyEmailPage({super.key});
@@ -13,31 +14,36 @@ class VerifyEmailPage extends StatefulWidget {
 
 class _VerifyEmailPageState extends State<VerifyEmailPage> {
   bool isEmailSent = false;
+  Timer? _timer;
   String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    // ⏱️ Start Heartbeat: Check verification status every 3 seconds automatically
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _checkVerificationStatus());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _checkVerificationStatus() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await user.reload();
-      if (user.emailVerified) {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        if (doc.exists) {
-          final role = doc.data()?['role'];
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-            'verified': true,
-            'accountStatus': role == 'teen' ? 'pending_parent' : 'active',
-          });
-        }
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const RoleRouter()),
-          );
-        }
-      } else {
-        setState(() {
-          errorMessage = "Email not verified yet. Please check your inbox.";
-        });
-      }
+    if (user == null) return;
+
+    await user.reload();
+    
+    if (user.emailVerified) {
+      _timer?.cancel(); // Stop checking once verified
+      
+      // Update Firestore so RoleRouter knows we are good to go
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'verified': true,
+      });
+      // The parent RoleRouter will now auto-rebuild and show the Profile Page
     }
   }
 
@@ -55,83 +61,118 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
         );
       }
     } catch (e) {
-      setState(() {
-        errorMessage = e.toString();
-      });
-    }
-  }
-
-  Future<void> _logout() async {
-    await FirebaseAuth.instance.signOut();
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const AuthPage()),
-      );
+      setState(() => errorMessage = "Too many requests. Please wait a moment.");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    
+
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Verify Email'),
+        title: Text('Verification', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: AppTheme.darkBlue,
         actions: [
-          IconButton(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout),
+          TextButton(
+            onPressed: () => FirebaseAuth.instance.signOut(),
+            child: Text('Logout', style: GoogleFonts.plusJakartaSans(color: Colors.redAccent, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Icon(
-              Icons.mark_email_read_outlined,
-              size: 100,
-              color: Colors.blue,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Verify your email address',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 🎨 PREMIUM ICON
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.teal.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.mark_email_unread_rounded,
+                  size: 80,
+                  color: AppTheme.teal,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'A verification email has been sent to ${user?.email ?? 'your email'}. Please click the link in the email to continue.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: _checkVerificationStatus,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: const Text('I HAVE VERIFIED MY EMAIL'),
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: isEmailSent ? null : _resendVerificationEmail,
-              child: Text(isEmailSent ? 'Email Resent' : 'Resend Verification Email'),
-            ),
-            if (errorMessage != null) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 32),
+              
               Text(
-                errorMessage!,
+                'Check Your Inbox',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.darkBlue,
+                ),
               ),
+              const SizedBox(height: 16),
+              
+              Text(
+                'We sent a link to ${user?.email ?? 'your email'}.\nClick it to unlock your Rodo account.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  color: Colors.black54,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 48),
+
+              // 🔄 ANIMATED STATUS
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.teal),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Waiting for verification...',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.teal,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 48),
+
+              // 📧 RESEND BUTTON
+              TextButton(
+                onPressed: isEmailSent ? null : _resendVerificationEmail,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: Text(
+                  isEmailSent ? 'Email Resent' : 'Didn\'t get it? Resend Email',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w800,
+                    color: isEmailSent ? Colors.grey : AppTheme.darkBlue,
+                  ),
+                ),
+              ),
+              
+              if (errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

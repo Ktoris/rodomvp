@@ -66,8 +66,8 @@ class _AuthPageState extends State<AuthPage> {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // 📧 EMAIL VERIFICATION DISABLED — uncomment to re-enable
-        // await userCredential.user!.sendEmailVerification();
+        // 📧 EMAIL VERIFICATION ENABLED
+        await userCredential.user?.sendEmailVerification();
       }
       if (mounted) {
         // Removed manual navigation to RoleRouter. 
