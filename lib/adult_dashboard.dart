@@ -690,7 +690,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
               padding: EdgeInsets.only(bottom: 4),
               child: Icon(Icons.group_outlined),
             ), 
-            label: 'Find Teens',
+            label: 'Find T eens',
           ),
           BottomNavigationBarItem(
             icon: Padding(
