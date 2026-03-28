@@ -120,7 +120,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
         return Scaffold(
           backgroundColor: AppTheme.backgroundGrey,
           appBar: AppBar(
-            title: Text('Adutl Dashbord', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800)),
+            title: Text('Adult Dashboard', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800)),
             centerTitle: false,
             actions: [
               IconButton(
