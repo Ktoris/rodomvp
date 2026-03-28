@@ -1,193 +1,244 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'lesson_detail_page.dart';
+import 'lessons_data.dart';
+import 'app_theme.dart';
 
 class LearnPage extends StatelessWidget {
   final String teenId;
+  final bool isEmbed;
 
-  const LearnPage({super.key, required this.teenId});
+  const LearnPage({super.key, required this.teenId, this.isEmbed = false});
 
   @override
   Widget build(BuildContext context) {
-    final tracks = [
-      {'id': 'prof', 'title': 'Professionalism', 'icon': Icons.business_center, 'color': Colors.blue},
-      {'id': 'outdoor', 'title': 'Lawn & Outdoor', 'icon': Icons.grass, 'color': Colors.green},
-      {'id': 'childcare', 'title': 'Childcare', 'icon': Icons.child_care, 'color': Colors.orange},
-      {'id': 'tutoring', 'title': 'Tutoring & Teaching', 'icon': Icons.menu_book, 'color': Colors.teal},
-      {'id': 'creative', 'title': 'Creative & Design', 'icon': Icons.brush, 'color': Colors.pink},
-      {'id': 'tech', 'title': 'Tech & Digital', 'icon': Icons.computer, 'color': Colors.cyan},
-      {'id': 'money', 'title': 'Money & Finance', 'icon': Icons.savings, 'color': Colors.purple},
-      {'id': 'safety', 'title': 'Safety & Contracts', 'icon': Icons.security, 'color': Colors.red},
-    ];
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(teenId).snapshots(),
+      builder: (context, userSnapshot) {
+        if (!userSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+        
+        final userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+        final stats = userData['stats'] ?? {};
+        final int xp = (stats['xp'] ?? 0) as int;
+        
+        // Level calculation logic (Step of 500 XP per level)
+        final int level = (xp / 500).floor() + 1;
+        final int xpIntoLevel = xp % 500;
+        final double progress = xpIntoLevel / 500;
+        
+        // Level titles (Mocked for premium feel)
+        final String levelTitle = _getLevelTitle(level);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Learn & Grow'),
-        elevation: 0,
-      ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(teenId).snapshots(),
-        builder: (context, userSnapshot) {
-          final stats = (userSnapshot.data?.data() as Map<String, dynamic>?)?['stats'] ?? {};
-          final xp = stats['xp'] ?? 0;
-          final level = (xp / 500).floor() + 1;
-          final xpIntoLevel = xp % 500;
-          final progress = xpIntoLevel / 500;
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // XP & Level Header
-                _buildLevelHeader(level, xpIntoLevel, progress),
-                const SizedBox(height: 24),
-
-                const Text(
-                  'Skill Tracks',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        Widget content = SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 🏆 HEADER CARD (Concept Design Style)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xff448AFF), // Premium Blue
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xff448AFF).withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-
-                // Tracks Grid
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.1,
-                  ),
-                  itemCount: tracks.length,
-                  itemBuilder: (context, index) {
-                    final track = tracks[index];
-                    return _buildTrackCard(context, track);
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CURRENT LEVEL',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Level $level — $levelTitle',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 10,
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '$xpIntoLevel / 500 XP to Level ${level + 1}',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-
-                const SizedBox(height: 32),
-                const Text(
-                  'Recommended Lessons',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              
+              const SizedBox(height: 32),
+              
+              // 📚 AVAILABLE LESSONS SECTION
+              Text(
+                'Available Lessons',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.darkBlue,
                 ),
-                const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 16),
+              
+              // 🚀 LESSONS LIST
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(teenId)
+                    .collection('lessonProgress')
+                    .snapshots(),
+                builder: (context, progressSnapshot) {
+                  final completedIds = progressSnapshot.hasData 
+                    ? progressSnapshot.data!.docs.map((d) => d.id).toSet() 
+                    : <String>{};
 
-                // Lessons List
-                StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance.collection('lessons').snapshots(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) return const LinearProgressIndicator();
+                  return Column(
+                    children: allLessons.map((lesson) {
+                      final bool isCompleted = completedIds.contains(lesson.id);
+                      return _buildLessonCard(context, lesson, isCompleted);
+                    }).toList(),
+                  );
+                },
+              ),
+              
+              const SizedBox(height: 40),
+            ],
+          ),
+        );
 
-                    final lessons = snapshot.data!.docs;
-                    if (lessons.isEmpty) {
-                      return const Text('No lessons available yet. Check back soon!', style: TextStyle(color: Colors.grey));
-                    }
+        if (isEmbed) return content;
 
-                    return Column(
-                      children: lessons.map((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        return _buildLessonTile(context, doc.id, data);
-                      }).toList(),
-                    );
-                  },
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+        return Scaffold(
+          backgroundColor: AppTheme.backgroundGrey,
+          appBar: AppBar(
+            title: const Text('Learn & Earn'),
+            centerTitle: false,
+          ),
+          body: content,
+        );
+      },
     );
   }
 
-  Widget _buildLevelHeader(int level, int xp, double progress) {
+  Widget _buildLessonCard(BuildContext context, LessonData lesson, bool isCompleted) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [Colors.blue.shade700, Colors.blue.shade500]),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Your Level', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                  Text('Level $level', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
-                child: Text('$xp / 500 XP', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.white.withOpacity(0.2),
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-              minHeight: 8,
-            ),
+        border: Border.all(color: Colors.black.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildTrackCard(BuildContext context, Map<String, dynamic> track) {
-    return InkWell(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Filter lessons by ${track['title']}')));
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: (track['color'] as Color).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: (track['color'] as Color).withOpacity(0.2)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(track['icon'] as IconData, size: 40, color: track['color'] as Color),
-            const SizedBox(height: 8),
-            Text(track['title'] as String, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLessonTile(BuildContext context, String lessonId, Map<String, dynamic> data) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
-          child: const Icon(Icons.play_lesson, color: Colors.blue),
-        ),
-        title: Text(data['title'] ?? 'Lesson', style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${data['duration'] ?? '5 min'} • ${data['xpReward'] ?? 50} XP'),
-        trailing: const Icon(Icons.chevron_right),
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => LessonDetailPage(lessonId: lessonId, teenId: teenId, lessonData: data),
+              builder: (_) => LessonDetailPage(
+                lessonId: lesson.id,
+                teenId: teenId,
+                lessonData: {
+                  'id': lesson.id,
+                  'title': lesson.title,
+                  'description': lesson.description,
+                  'xpReward': lesson.xpReward,
+                  'blocks': lesson.blocks,
+                },
+              ),
             ),
           );
         },
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: lesson.color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(lesson.icon, color: lesson.color, size: 24),
+        ),
+        title: Text(
+          lesson.title,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.darkBlue,
+          ),
+        ),
+        subtitle: Row(
+          children: [
+            Text(
+              '${lesson.xpReward} XP',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.black38,
+              ),
+            ),
+            if (isCompleted) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'COMPLETED',
+                  style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ],
+        ),
+        trailing: Icon(
+          Icons.chevron_right_rounded,
+          color: AppTheme.darkBlue.withOpacity(0.3),
+        ),
       ),
     );
+  }
+
+  String _getLevelTitle(int level) {
+    if (level < 2) return 'Beginner';
+    if (level < 3) return 'Rookie';
+    if (level < 4) return 'Go-Getter';
+    if (level < 5) return 'Professional';
+    if (level < 6) return 'Expert';
+    return 'Master Master';
   }
 }

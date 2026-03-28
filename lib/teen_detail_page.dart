@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'create_job_request_page.dart';
+import 'availability_calendar.dart';
 
 class TeenDetailPage extends StatelessWidget {
   final String teenId;
@@ -45,10 +46,14 @@ class TeenDetailPage extends StatelessWidget {
 
     if (jobData == null) return;
 
+    final teenSnap = await firestore.collection('users').doc(teenId).get();
+    final teenData = teenSnap.data() as Map<String, dynamic>? ?? {};
+
     await firestore.collection('hire_requests').add({
       'adultId': adultId,
       'adultName': adultName,
       'teenId': teenId,
+      'teenName': '${teenData['name'] ?? ''} ${teenData['surname'] ?? ''}',
       'status': 'pending',
       'createdAt': Timestamp.now(),
       'jobTitle': jobData['jobTitle'],
@@ -56,8 +61,8 @@ class TeenDetailPage extends StatelessWidget {
       'jobDescription': jobData['jobDescription'],
       'locationType': jobData['locationType'],
       'locationText': jobData['locationText'],
-      'locationData': jobData['locationData'], // 📍 NEW
-      'date': jobData['date'] as DateTime, // 📅 NEW
+      'locationData': jobData['locationData'], 
+      'date': jobData['date'] as DateTime, 
       'duration': jobData['duration'],
       'budget': jobData['budget'],
       'numTeens': jobData['numTeens'],
@@ -76,10 +81,7 @@ class TeenDetailPage extends StatelessWidget {
         title: const Text('Teen Profile'),
       ),
       body: FutureBuilder<DocumentSnapshot>(
-        future: FirebaseFirestore.instance
-            .collection('users')
-            .doc(teenId)
-            .get(),
+        future: FirebaseFirestore.instance.collection('users').doc(teenId).get(),
         builder: (context, teenSnapshot) {
           if (!teenSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -89,20 +91,15 @@ class TeenDetailPage extends StatelessWidget {
             return const Center(child: Text('Teen profile not found'));
           }
 
-          final teenData =
-              teenSnapshot.data!.data() as Map<String, dynamic>;
+          final teenData = teenSnapshot.data!.data() as Map<String, dynamic>;
           final skills = List<String>.from(teenData['skills'] ?? []);
-          final double rating =
-              (teenData['avgRating'] ?? teenData['rating'] ?? 0).toDouble();
-          final int reviewCount =
-              ((teenData['reviewCount'] ?? teenData['ratingCount'] ?? 0) as num)
-                  .toInt();
+          final double rating = (teenData['avgRating'] ?? teenData['rating'] ?? 0).toDouble();
+          final int reviewCount = ((teenData['reviewCount'] ?? teenData['ratingCount'] ?? 0) as num).toInt();
 
           final stats = teenData['stats'] ?? {};
           final int jobsDone = (stats['jobsDone'] ?? 0) as int;
           final int totalEarned = (stats['totalEarned'] ?? 0) as int;
           final int lessonsCompleted = (stats['lessonsCompleted'] ?? 0) as int;
-          final int repeatHires = (stats['repeatHires'] ?? 0) as int;
           final badges = List<String>.from(teenData['badges'] ?? []);
           final portfolio = List<String>.from(teenData['portfolio'] ?? []);
 
@@ -111,33 +108,56 @@ class TeenDetailPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🔹 HEADER CARD
+                // 🔹 HEADER CARD (Centered)
                 Center(
                   child: Column(
                     children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundImage: teenData['profilePhotoUrl'] != null
-                            ? NetworkImage(teenData['profilePhotoUrl'])
-                            : null,
-                        child: teenData['profilePhotoUrl'] == null
-                            ? const Icon(Icons.person, size: 50)
-                            : null,
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.grey.shade100,
+                            backgroundImage: teenData['profilePhotoUrl'] != null
+                                ? NetworkImage(teenData['profilePhotoUrl'])
+                                : null,
+                            child: teenData['profilePhotoUrl'] == null
+                                ? Icon(Icons.person, size: 60, color: Colors.grey.shade400)
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 4,
+                            right: 4,
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 3),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       Text(
                         '${teenData['name'] ?? ''} ${teenData['surname'] ?? ''}',
                         style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
                         ),
                       ),
                       if (teenData['age'] != null && teenData['city'] != null)
                         Text(
                           '${teenData['age']} yrs • ${teenData['city']}',
-                          style: const TextStyle(fontSize: 16, color: Colors.grey),
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.black.withOpacity(0.4),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -145,122 +165,151 @@ class TeenDetailPage extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             '${rating.toStringAsFixed(1)} ★ ($reviewCount)',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
-                              color: Colors.grey,
+                              color: Colors.black.withOpacity(0.4),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
-                      if (repeatHires > 0) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '✔ $repeatHires people would hire again',
-                          style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
                       if (teenData['hourlyRate'] != null)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.green.shade100,
-                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xffFFF9C4), // Light yellow
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xffFFF176).withOpacity(0.3)),
                           ),
                           child: Text(
                             '\$${teenData['hourlyRate']}/hr',
-                            style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: Color(0xffF57F17),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // 🔹 HIRE BUTTON (Top)
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => hireTeen(context),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('Hire This Teen'),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                      const SizedBox(height: 24),
+                      
+                      // 🔹 HIRE BUTTON (Centered & Smaller)
+                      SizedBox(
+                        width: 220,
+                        child: ElevatedButton(
+                          onPressed: () => hireTeen(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xff448AFF), // Lighter blue
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Hire This Teen',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
 
-                // 🔹 PERFORMANCE METRICS STRIP (Horizontal Scroll)
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _MetricCard(icon: Icons.check_circle_outline, title: 'Jobs Done', value: '$jobsDone'),
-                      _MetricCard(icon: Icons.attach_money, title: 'Earned', value: '\$${(totalEarned / 100).toStringAsFixed(2)}'),
-                      _MetricCard(icon: Icons.menu_book, title: 'Lessons', value: '$lessonsCompleted'),
+                      // 🔹 METRICS ROW
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: _MetricCard(icon: Icons.check_circle_outline, iconColor: Colors.blue, title: 'Jobs Done', value: '$jobsDone')),
+                          const SizedBox(width: 12),
+                          Expanded(child: _MetricCard(icon: Icons.menu_book, iconColor: const Color(0xff1A237E), title: 'Lessons', value: '$lessonsCompleted')),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
                 // 🔹 SKILLS
                 if (skills.isNotEmpty) ...[
                   const Text(
                     'Skills',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: skills
-                        .map((s) => Chip(
-                              label: Text(s),
-                              backgroundColor: Colors.blue.shade50,
-                            ))
-                        .toList(),
+                    children: skills.map((s) => Chip(
+                      label: Text(s),
+                      backgroundColor: Colors.blue.shade50,
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    )).toList(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                 ],
 
                 // 🔹 BIO
                 if (teenData['bio']?.toString().isNotEmpty ?? false) ...[
                   const Text(
                     'Bio',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.blue.withOpacity(0.1)),
                     ),
                     child: Text(
                       teenData['bio'],
-                      style: const TextStyle(fontSize: 14),
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.black.withOpacity(0.7),
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                 ],
+
+                // 🔹 AVAILABILITY
+                const Text(
+                  'Availability',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.blue.withOpacity(0.05)),
+                    boxShadow: [
+                      BoxShadow(color: Colors.blue.shade900.withOpacity(0.02), blurRadius: 40, offset: const Offset(0, 10)),
+                    ],
+                  ),
+                  child: AvailabilityCalendar(
+                    selectedSlots: Set<String>.from(teenData['availability'] ?? []),
+                    isReadOnly: true,
+                  ),
+                ),
+                const SizedBox(height: 32),
 
                 // 🔹 PORTFOLIO / GALLERY
                 if (portfolio.isNotEmpty) ...[
                   const Text(
                     'Portfolio',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   SizedBox(
                     height: 120,
                     child: ListView.builder(
@@ -268,10 +317,10 @@ class TeenDetailPage extends StatelessWidget {
                       itemCount: portfolio.length,
                       itemBuilder: (context, index) {
                         return Container(
-                          margin: const EdgeInsets.only(right: 8),
+                          margin: const EdgeInsets.only(right: 12),
                           width: 120,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
                             image: DecorationImage(
                               image: NetworkImage(portfolio[index]),
                               fit: BoxFit.cover,
@@ -281,136 +330,80 @@ class TeenDetailPage extends StatelessWidget {
                       },
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                 ],
 
                 // 🔹 BADGES SECTION
                 if (badges.isNotEmpty) ...[
                   const Text(
                     'Badges',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     children: badges.map((b) => Chip(
-                      avatar: const Icon(Icons.military_tech, color: Colors.amber),
+                      avatar: const Icon(Icons.military_tech, color: Colors.amber, size: 18),
                       label: Text(b),
+                      backgroundColor: Colors.amber.shade50,
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     )).toList(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                 ],
 
                 // 🔹 REVIEWS SECTION
                 const Text(
                   'Reviews',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 8),
-
+                const SizedBox(height: 12),
                 StreamBuilder<DocumentSnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(teenId)
-                      .snapshots(),
+                  stream: FirebaseFirestore.instance.collection('users').doc(teenId).snapshots(),
                   builder: (context, teenSnapshot) {
-                    if (!teenSnapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    final teenData =
-                        teenSnapshot.data!.data() as Map<String, dynamic>? ?? {};
-                    final reviews = 
-                        (teenData['reviews'] as List<dynamic>?) ?? [];
+                    if (!teenSnapshot.hasData) return const SizedBox();
+                    final data = teenSnapshot.data!.data() as Map<String, dynamic>? ?? {};
+                    final reviews = (data['reviews'] as List<dynamic>?) ?? [];
 
                     if (reviews.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Text(
-                          'No reviews yet',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      );
+                      return Text('No reviews yet', style: TextStyle(color: Colors.black.withOpacity(0.3), fontStyle: FontStyle.italic));
                     }
 
-                    // Sort reviews by createdAt descending
-                    final sortedReviews = List<Map<String, dynamic>>.from(
-                      reviews.whereType<Map<String, dynamic>>()
-                    )..sort((a, b) {
-                      final aTime = a['createdAt'] as Timestamp?;
-                      final bTime = b['createdAt'] as Timestamp?;
-                      if (aTime == null || bTime == null) return 0;
-                      return bTime.compareTo(aTime);
-                    });
+                    final sortedReviews = List<Map<String, dynamic>>.from(reviews.whereType<Map<String, dynamic>>())
+                      ..sort((a, b) {
+                        final aTime = a['createdAt'] as Timestamp?;
+                        final bTime = b['createdAt'] as Timestamp?;
+                        if (aTime == null || bTime == null) return 0;
+                        return bTime.compareTo(aTime);
+                      });
 
                     return Column(
-                      children: sortedReviews.take(3).map((reviewData) { // Display top 3 reviews
-                        final reviewRating =
-                            (reviewData['rating'] ?? 0).toDouble();
-                        final reviewComment =
-                            reviewData['comment']?.toString() ?? '';
-                        final createdAt = reviewData['createdAt'] as Timestamp?;
-                        final reviewerName =
-                            reviewData['adultName']?.toString() ?? 'Anonymous';
-
-                        final children = <Widget>[
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  reviewerName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              _StarRating(rating: reviewRating),
-                              const SizedBox(width: 4),
-                              Text(
-                                reviewRating.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ];
-
-                        if (createdAt != null) {
-                          children.addAll([
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatDate(createdAt),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ]);
-                        }
-
-                        if (reviewComment.isNotEmpty) {
-                          children.addAll([
-                            const SizedBox(height: 8),
-                            Text('"$reviewComment"', style: const TextStyle(fontStyle: FontStyle.italic)),
-                          ]);
-                        }
-
+                      children: sortedReviews.take(3).map((review) {
+                        final rRating = (review['rating'] ?? 0).toDouble();
                         return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          color: Colors.grey.shade50,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(color: Colors.blue.withOpacity(0.1)),
+                          ),
                           child: Padding(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: children,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(child: Text(review['adultName'] ?? 'Anonymous', style: const TextStyle(fontWeight: FontWeight.bold))),
+                                    _StarRating(rating: rRating),
+                                  ],
+                                ),
+                                if (review['comment'] != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text('"${review['comment']}"', style: const TextStyle(fontStyle: FontStyle.italic)),
+                                ],
+                              ],
                             ),
                           ),
                         );
@@ -418,20 +411,7 @@ class TeenDetailPage extends StatelessWidget {
                     );
                   },
                 ),
-
-                const SizedBox(height: 24),
-
-                // 🔹 HIRE BUTTON
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => hireTeen(context),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('Hire This Teen'),
-                  ),
-                ),
+                const SizedBox(height: 48),
               ],
             ),
           );
@@ -446,10 +426,8 @@ class TeenDetailPage extends StatelessWidget {
   }
 }
 
-/// ⭐ Star rating widget
 class _StarRating extends StatelessWidget {
   final double rating;
-
   const _StarRating({required this.rating});
 
   @override
@@ -458,42 +436,59 @@ class _StarRating extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
         if (rating >= index + 1) {
-          return const Icon(Icons.star, size: 20, color: Colors.amber);
+          return const Icon(Icons.star, size: 18, color: Colors.amber);
         } else if (rating > index && rating < index + 1) {
-          return const Icon(Icons.star_half, size: 20, color: Colors.amber);
+          return const Icon(Icons.star_half, size: 18, color: Colors.amber);
         } else {
-          return const Icon(Icons.star_border, size: 20, color: Colors.amber);
+          return const Icon(Icons.star_border, size: 18, color: Colors.amber);
         }
       }),
     );
   }
 }
 
-// 🔹 Metric Card for Profile Strip
 class _MetricCard extends StatelessWidget {
   final IconData icon;
+  final Color iconColor;
   final String title;
   final String value;
 
-  const _MetricCard({required this.icon, required this.title, required this.value});
+  const _MetricCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 100,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade100),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blue.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.shade900.withOpacity(0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Icon(icon, color: Colors.blue.shade700),
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+          ),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(
+            title,
+            style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.4), fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );

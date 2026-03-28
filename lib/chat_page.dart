@@ -36,11 +36,12 @@ class _ChatPageState extends State<ChatPage> {
         .doc(widget.chatId)
         .collection('messages')
         .where('senderId', isNotEqualTo: userId)
-        .where('status', isNotEqualTo: 'read')
         .get()
         .then((snapshot) {
       for (var doc in snapshot.docs) {
-        doc.reference.update({'status': 'read'});
+        if (doc.data()['status'] != 'read') {
+          doc.reference.update({'status': 'read'});
+        }
       }
     });
   }

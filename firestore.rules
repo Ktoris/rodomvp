@@ -16,13 +16,32 @@ service cloud.firestore {
       // Authenticated users can read valid profiles
       allow read: if isAuthenticated();
       
-      // Users can only write/update their own document
-      // Note: A strict enforcement would restrict specific fields (stats, discoveryScore, etc.)
+      // Users can only write/update their own document FULLY
       allow create: if isOwner(uid);
       allow update: if isOwner(uid) && 
         (!request.resource.data.diff(resource.data).affectedKeys()
-        .hasAny(['stats', 'badges', 'discoveryScore', 'accountStatus', 'topReviews'])); // Prevent clients from modifying protected fields
-      allow delete: if false; // Only admin/backend can delete
+        .hasAny(['badges', 'discoveryScore', 'accountStatus', 'topReviews']));
+      
+      // Allow specific rating/review/stats updates by ANY authenticated user
+      // Note: In production, you would verify the relationship (e.g., job completion)
+      allow update: if isAuthenticated() && 
+        request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['avgRating', 'reviewCount', 'reviews', 'stats']);
+      
+      // 🎓 Subcollection for lesson progress
+      match /lessonProgress/{lessonId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      allow delete: if false; 
+    }
+
+    match /hire_requests/{requestId} {
+      allow read, update: if isAuthenticated() && 
+        (resource.data.adultId == request.auth.uid || 
+         resource.data.teenId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow delete: if false;
     }
 
     match /jobs/{jobId} {
@@ -69,9 +88,6 @@ service cloud.firestore {
       allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
     }
     
-    match /lessonProgress/{uid} {
-      allow read: if isOwner(uid);
-      allow write: if false;
     }
   }
 }

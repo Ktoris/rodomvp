@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'app_theme.dart';
 
 class CreateJobRequestPage extends StatefulWidget {
   const CreateJobRequestPage({super.key});
@@ -14,12 +16,12 @@ class _CreateJobRequestPageState extends State<CreateJobRequestPage> {
   final budgetController = TextEditingController();
   Map<String, dynamic>? locationData;
 
-  String jobCategory = 'Lawn Care';
+  String jobCategory = 'Tutoring';
   final jobCategories = [
+    'Tutoring',
     'Lawn Care',
     'Car Wash',
     'Babysitting',
-    'Tutoring',
     'Design',
     'Errands',
     'Events',
@@ -62,8 +64,10 @@ class _CreateJobRequestPageState extends State<CreateJobRequestPage> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
+        content: Text(message, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -73,7 +77,6 @@ class _CreateJobRequestPageState extends State<CreateJobRequestPage> {
       return;
     }
 
-    // Combine date and time
     final completeDate = DateTime(
       selectedDate!.year,
       selectedDate!.month,
@@ -85,7 +88,7 @@ class _CreateJobRequestPageState extends State<CreateJobRequestPage> {
     Navigator.pop(context, {
       'jobTitle': titleController.text.trim(),
       'jobCategory': jobCategory,
-      'jobDescription': descriptionController.text.trim(), // Optional
+      'jobDescription': descriptionController.text.trim(),
       'locationType': locationType,
       'locationText': locationType == 'remote'
           ? 'Remote'
@@ -98,221 +101,194 @@ class _CreateJobRequestPageState extends State<CreateJobRequestPage> {
     });
   }
 
-  void _openMapPicker() {
-    // Simulated Map Picker Dialog
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Simulated Map Picker'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundGrey,
+      appBar: AppBar(
+        title: Text('New Job Request', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800)),
+        centerTitle: true,
+        backgroundColor: AppTheme.darkBlue,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.map, size: 64, color: Colors.blue),
-            SizedBox(height: 16),
-            Text('Tap on the map to set a location.'),
-            Text('(Simulation: Random coordinates generated)',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            _buildSectionTitle('Engagement Details'),
+            const SizedBox(height: 16),
+            _buildTextField(titleController, 'Job Title *', 'e.g. Math Tutoring Session'),
+            const SizedBox(height: 16),
+            _buildDropdown('Category *', jobCategory, jobCategories, (val) => setState(() => jobCategory = val!)),
+            const SizedBox(height: 16),
+            _buildTextField(descriptionController, 'Short Description', 'What needs to be done?', maxLines: 3),
+            
+            const SizedBox(height: 32),
+            _buildSectionTitle('Time & Budget'),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _buildPickerButton(selectedDate == null ? 'Set Date' : _formatDate(selectedDate!), Icons.calendar_today_rounded, _selectDate)),
+                const SizedBox(width: 12),
+                Expanded(child: _buildPickerButton(selectedTime == null ? 'Set Time' : selectedTime!.format(context), Icons.access_time_rounded, _selectTime)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _buildDropdown('Duration', duration, durations, (val) => setState(() => duration = val!))),
+                const SizedBox(width: 12),
+                Expanded(child: _buildTextField(budgetController, 'Pay (\$)', '0.00', keyboardType: TextInputType.number)),
+              ],
+            ),
+
+            const SizedBox(height: 32),
+            _buildSectionTitle('Location'),
+            const SizedBox(height: 12),
+            _buildLocationTypeSelector(),
+            if (locationType == 'other_location') ...[
+              const SizedBox(height: 12),
+              _buildTextField(locationController, 'Address', 'Enter address or venue'),
+            ],
+
+            const SizedBox(height: 48),
+            SizedBox(
+              width: double.infinity,
+              height: 60,
+              child: ElevatedButton(
+                onPressed: _validateAndSubmit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.darkBlue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
+                ),
+                child: Text('Confirm & Send Request', style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w800)),
+              ),
+            ),
+            const SizedBox(height: 40),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                locationData = {
-                  'lat': 40.7128 + (0.01 * (0.5 - (0.5))), // Randomish
-                  'lng': -74.0060 + (0.01 * (0.5 - (0.5))),
-                  'address': 'Simulated Address, Park Ave',
-                };
-                locationController.text = locationData!['address'];
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Confirm Location'),
-          ),
-        ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Create Job')),
-      body: Padding(
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title.toUpperCase(),
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        color: AppTheme.teal,
+        letterSpacing: 1.5,
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, String hint, {int maxLines = 1, TextInputType keyboardType = TextInputType.text}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.darkBlue)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.all(16),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdown(String label, String value, List<String> items, Function(String?) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.darkBlue)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, color: Colors.black),
+              items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPickerButton(String label, IconData icon, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
         padding: const EdgeInsets.all(16),
-        child: ListView(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        child: Row(
           children: [
-            // 🔹 TITLE
-            TextField(
-              controller: titleController,
-              maxLength: 60,
-              decoration: const InputDecoration(labelText: 'Job Title *'),
-            ),
-            const SizedBox(height: 10),
-
-            // 🔹 CATEGORY
-            DropdownButtonFormField<String>(
-              value: jobCategory,
-              decoration: const InputDecoration(labelText: 'Job Category *'),
-              items: jobCategories.map((cat) {
-                return DropdownMenuItem(value: cat, child: Text(cat));
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => jobCategory = val);
-              },
-            ),
-            const SizedBox(height: 20),
-
-            // 🔹 DESCRIPTION (OPTIONAL)
-            TextField(
-              controller: descriptionController,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Job Description (Optional)'),
-            ),
-            const SizedBox(height: 20),
-
-            // 🔹 LOCATION
-            const Text('Location *', style: TextStyle(fontWeight: FontWeight.bold)),
-            RadioListTile(
-              value: 'my_address',
-              groupValue: locationType,
-              title: const Text('My Address'),
-              onChanged: (v) => setState(() => locationType = v!),
-            ),
-            RadioListTile(
-              value: 'other_location',
-              groupValue: locationType,
-              title: const Text('Other Location'),
-              onChanged: (v) => setState(() => locationType = v!),
-            ),
-            RadioListTile(
-              value: 'remote',
-              groupValue: locationType,
-              title: const Text('Remote'),
-              onChanged: (v) => setState(() => locationType = v!),
-            ),
-            if (locationType == 'other_location')
-              Column(
-                children: [
-                  TextField(
-                    controller: locationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Specific Location',
-                      hintText: 'e.g. 123 Main St',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: _openMapPicker,
-                    icon: const Icon(Icons.map),
-                    label: const Text('Set on Map'),
-                  ),
-                ],
-              ),
-            const SizedBox(height: 20),
-
-            // 🔹 DATE & TIME
-            const Text('Date & Time *', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime(2100),
-                        initialDate: selectedDate ?? DateTime.now(),
-                      );
-                      if (picked != null) {
-                        setState(() => selectedDate = picked);
-                      }
-                    },
-                    child: Text(selectedDate == null ? 'Select Date' : _formatDate(selectedDate!)),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: selectedTime ?? TimeOfDay.now(),
-                      );
-                      if (picked != null) {
-                        setState(() => selectedTime = picked);
-                      }
-                    },
-                    child: Text(selectedTime == null ? 'Select Time' : selectedTime!.format(context)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // 🔹 DURATION
-            DropdownButtonFormField<String>(
-              value: duration,
-              decoration: const InputDecoration(labelText: 'Estimated Duration *'),
-              items: durations.map((d) {
-                return DropdownMenuItem(value: d, child: Text(d));
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => duration = val);
-              },
-            ),
-            const SizedBox(height: 20),
-
-            // 🔹 BUDGET / PAY
-            TextField(
-              controller: budgetController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Offered Pay *',
-                prefixText: '\$ ',
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 🔹 NUMBER OF TEENS
-            const Text('Teens Needed', style: TextStyle(fontWeight: FontWeight.bold)),
-            Row(
-              children: List.generate(3, (index) {
-                final count = index + 1;
-                return Expanded(
-                  child: RadioListTile<int>(
-                    title: Text('$count'),
-                    value: count,
-                    groupValue: numTeens,
-                    onChanged: (v) => setState(() => numTeens = v!),
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 30),
-
-            // 🔹 SUBMIT
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _validateAndSubmit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Send Hire Request', style: TextStyle(fontSize: 16)),
-              ),
-            ),
-            const SizedBox(height: 20),
+            Icon(icon, size: 18, color: AppTheme.teal),
+            const SizedBox(width: 12),
+            Text(label, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildLocationTypeSelector() {
+    return Wrap(
+      spacing: 8,
+      children: [
+        _buildChoiceChip('Remote', 'remote'),
+        _buildChoiceChip('My Address', 'my_address'),
+        _buildChoiceChip('Other', 'other_location'),
+      ],
+    );
+  }
+
+  Widget _buildChoiceChip(String label, String type) {
+    final isSelected = locationType == type;
+    return ChoiceChip(
+      label: Text(label, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 13)),
+      selected: isSelected,
+      onSelected: (val) => setState(() => locationType = type),
+      selectedColor: AppTheme.teal.withOpacity(0.2),
+      backgroundColor: Colors.white,
+      labelStyle: TextStyle(color: isSelected ? AppTheme.teal : Colors.black54),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide.none),
+    );
+  }
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+      initialDate: selectedDate ?? DateTime.now(),
+    );
+    if (picked != null) setState(() => selectedDate = picked);
+  }
+
+  Future<void> _selectTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: selectedTime ?? TimeOfDay.now(),
+    );
+    if (picked != null) setState(() => selectedTime = picked);
   }
 }

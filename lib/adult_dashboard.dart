@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:math';
+import 'app_theme.dart';
 import 'create_job_request_page.dart';
 import 'chat_page.dart';
 import 'teen_detail_page.dart';
@@ -20,20 +22,13 @@ class _AdultDashboardState extends State<AdultDashboard> {
   int _currentIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  List<String> _selectedSkills = [];
-  double _minRating = 0.0;
-  int _minAge = 13;
-  int _maxAge = 17;
-  bool _remoteOnly = false;
-  bool _sortByDistance = false;
-  
-  // Simulated "My Location" (NYC)
-  final double _myLat = 40.7128;
-  final double _myLng = -74.0060;
+  late Future<String> _adultNameFuture; // 🔹 Cached future to prevent loading on every rebuild
 
+  
   @override
   void initState() {
     super.initState();
+    _adultNameFuture = getAdultName(); // 🔹 Initialize once
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase().trim();
@@ -55,33 +50,13 @@ class _AdultDashboardState extends State<AdultDashboard> {
 
   String get adultId => widget.adultId;
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    var p = 0.017453292519943295;
-    var c = cos;
-    var a = 0.5 - c((lat2 - lat1) * p) / 2 +
-        c(lat1 * p) * c(lat2 * p) *
-            (1 - c((lon2 - lon1) * p)) / 2;
-    return 12742 * asin(sqrt(a)); // 2 * R; R = 6371 km
-  }
-
-  // 🔹 Get adult name once
   Future<String> getAdultName() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(adultId)
-        .get();
-
-    return doc.data()?['name'] ?? '';
+    final doc = await FirebaseFirestore.instance.collection('users').doc(adultId).get();
+    return doc.data()?['name'] ?? 'User';
   }
 
-  // 🔒 Prevent duplicate hire requests + open job form
-  Future<void> hireTeen(
-    BuildContext context,
-    String teenId,
-    String adultName,
-  ) async {
+  Future<void> hireTeen(BuildContext context, String teenId, String adultName) async {
     final firestore = FirebaseFirestore.instance;
-
     final existingRequest = await firestore
         .collection('hire_requests')
         .where('adultId', isEqualTo: adultId)
@@ -92,11 +67,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
     if (existingRequest.docs.isNotEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'You already have an active request with this teen.',
-          ),
-        ),
+        const SnackBar(content: Text('You already have an active request with this teen.')),
       );
       return;
     }
@@ -104,9 +75,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
     if (!mounted) return;
     final jobData = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const CreateJobRequestPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const CreateJobRequestPage()),
     );
 
     if (jobData == null) return;
@@ -130,17 +99,16 @@ class _AdultDashboardState extends State<AdultDashboard> {
     });
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Hire request sent')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hire request sent')));
   }
 
   @override
   Widget build(BuildContext context) {
-
     return FutureBuilder<String>(
-      future: getAdultName(),
+      future: _adultNameFuture,
       builder: (context, snapshot) {
+        // Correcting loading state: 
+        // Showing a proper full-screen loader until the identity is confirmed.
         if (!snapshot.hasData) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -150,961 +118,787 @@ class _AdultDashboardState extends State<AdultDashboard> {
         final adultName = snapshot.data!;
 
         return Scaffold(
+          backgroundColor: AppTheme.backgroundGrey,
           appBar: AppBar(
-            title: const Text('Adult Dashboard'),
+            title: Text('Adult Dashboard', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800)),
+            centerTitle: false,
             actions: [
               IconButton(
-                icon: const Icon(Icons.help_outline),
-                tooltip: 'Help & Support',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SupportPage()),
-                  );
-                },
+                icon: const Icon(Icons.help_outline_rounded, color: AppTheme.darkBlue),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportPage())),
               ),
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('notifications')
-                    .doc(adultId)
-                    .collection('items')
-                    .where('read', isEqualTo: false)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  int unreadCount = 0;
-                  if (snapshot.hasData) {
-                    unreadCount = snapshot.data!.docs.length;
-                  }
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.notifications),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => NotificationsPage(uid: adultId),
-                            ),
-                          );
-                        },
+              _buildNotificationBadge(),
+              const SizedBox(width: 8),
+            ],
+          ),
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _currentIndex == 0 ? 'Find Teens' : 'Active Jobs',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.darkBlue,
                       ),
-                      if (unreadCount > 0)
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            child: Text(
-                              '$unreadCount',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
+                    ),
+                    if (_currentIndex == 0)
+                      Text(
+                        'Browse available teen profiles',
+                        style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontWeight: FontWeight.w600),
+                      ),
+                  ],
+                ),
+              ),
+
+              // 🔹 VIEW CONTENT
+              Expanded(
+                child: _currentIndex == 0 
+                    ? _buildFindTeens(adultName) 
+                    : _buildManagement(adultName),
               ),
             ],
           ),
-          body: _buildBody(adultName),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: (index) => setState(() => _currentIndex = index),
-            items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Find Teens'),
-              BottomNavigationBarItem(icon: Icon(Icons.group), label: 'My Teens'),
-              BottomNavigationBarItem(icon: Icon(Icons.work), label: 'My Jobs'),
-            ],
-          ),
+          bottomNavigationBar: _buildBottomNav(),
         );
       },
     );
   }
 
-  Widget _buildBody(String adultName) {
-    if (_currentIndex == 0) return _buildFindTeens(adultName);
-    if (_currentIndex == 1) return _buildMyTeens(adultName);
-    return _buildMyJobs(adultName);
-  }
-
   Widget _buildFindTeens(String adultName) {
-    final teensCollection = FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'teen');
-    return ListView(
-      padding: const EdgeInsets.all(12),
+    return Column(
       children: [
-        const Text(
-          'Find Teens',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-              const SizedBox(height: 8),
-
-              // 🔹 SEARCH BAR & FILTERS
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search by skill...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() => _searchQuery = '');
-                                },
-                              )
-                            : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: Icon(
-                      Icons.filter_list,
-                      color: (_selectedSkills.isNotEmpty || _minRating > 0 || _minAge > 13 || _maxAge < 17 || _remoteOnly)
-                          ? Colors.blue
-                          : null,
-                    ),
-                    onPressed: () => _showFilterSheet(context),
-                  ),
-                ],
+        // 🔹 SEARCH BAR
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: TextField(
+            controller: _searchController,
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+            decoration: InputDecoration(
+              hintText: 'Search by skill (e.g. Tutoring)',
+              prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.darkBlue),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
               ),
-              const SizedBox(height: 12),
-
-              // 🔹 TEEN BROWSER
-              StreamBuilder<QuerySnapshot>(
-                stream: teensCollection.snapshots(),
-                builder: (context, teenSnapshot) {
-                  if (!teenSnapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final teenDocs = teenSnapshot.data!.docs;
-                  if (teenDocs.isEmpty) return const Text('No teens available');
-
-                  final bool hasActiveFilters = _searchQuery.isNotEmpty || 
-                                              _selectedSkills.isNotEmpty || 
-                                              _minRating > 0 || 
-                                              _minAge > 13 || 
-                                              _maxAge < 17 || 
-                                              _remoteOnly;
-
-                  final filteredTeens = teenDocs.where((teen) {
-                    final data = teen.data() as Map<String, dynamic>;
-                    
-                    // Allow test accounts without status, but if status exists it must be active (or pending for testing)
-                    // If you strictly want ONLY 'active', you can enforce it, but for a foolproof MVP it's often better to check if it's explicitly suspended
-                    if (data['accountStatus'] == 'suspended') return false;
-
-                    if (!hasActiveFilters) {
-                      return true;
-                    }
-
-                    // Basic search (keyword in skills or name)
-                    final name = '${data['name'] ?? ''} ${data['surname'] ?? ''}'.toLowerCase();
-                    final skills = List<String>.from(data['skills'] ?? []).map((s) => s.toLowerCase()).toList();
-                    
-                    if (_searchQuery.isNotEmpty) {
-                      bool matchesSearch = name.contains(_searchQuery) || 
-                                          skills.any((s) => s.contains(_searchQuery));
-                      if (!matchesSearch) return false;
-                    }
-
-                    // Skill filters (exact match or list inclusion)
-                    if (_selectedSkills.isNotEmpty) {
-                      if (!skills.any((s) => _selectedSkills.contains(s))) return false;
-                    }
-
-                    // Rating filter
-                    if (_minRating > 0) {
-                      final double rating = (data['avgRating'] ?? data['rating'] ?? 0).toDouble();
-                      if (rating < _minRating) return false;
-                    }
-
-                    // Age filter
-                    if (_minAge > 13 || _maxAge < 17) {
-                      // Handle age carefully (might be string or int)
-                      final int age = int.tryParse(data['age']?.toString() ?? '0') ?? 0;
-                      if (age > 0 && (age < _minAge || age > _maxAge)) return false;
-                      if (age == 0) return false; // Hide unknown ages if actively filtering by age
-                    }
-
-                    // Remote filter
-                    if (_remoteOnly) {
-                      final bool isRemote = data['workRemote'] ?? false;
-                      if (!isRemote) return false;
-                    }
-
-                    return true;
-                  }).toList();
-
-                  // 🔹 SORTING LOGIC
-                  filteredTeens.sort((a, b) {
-                    final dataA = a.data() as Map<String, dynamic>;
-                    final dataB = b.data() as Map<String, dynamic>;
-
-                    if (_sortByDistance) {
-                      final locA = dataA['location'] as Map<String, dynamic>?;
-                      final locB = dataB['location'] as Map<String, dynamic>?;
-
-                      final distA = (locA != null) 
-                          ? _calculateDistance(_myLat, _myLng, locA['lat'], locA['lng'])
-                          : 999999.0;
-                      final distB = (locB != null)
-                          ? _calculateDistance(_myLat, _myLng, locB['lat'], locB['lng'])
-                          : 999999.0;
-                      
-                      return distA.compareTo(distB); // Ascending (closest first)
-                    } else {
-                      // Default: Sort by Discovery Score (Ranking)
-                      final scoreA = (dataA['discoveryScore'] ?? 0).toDouble();
-                      final scoreB = (dataB['discoveryScore'] ?? 0).toDouble();
-                      return scoreB.compareTo(scoreA); // Descending
-                    }
-                  });
-
-                  if (filteredTeens.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text(
-                        'No teens found with that skill',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    );
-                  }
-
-                  return Column(
-                    children: filteredTeens.map((teen) {
-                      final data = teen.data() as Map<String, dynamic>;
-                      final skills = List<String>.from(data['skills'] ?? []);
-                      final double rating =
-                          (data['avgRating'] ?? data['rating'] ?? 0).toDouble();
-                      final int reviewCount =
-                          ((data['reviewCount'] ?? data['ratingCount'] ?? 0)
-                                  as num)
-                              .toInt();
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => TeenDetailPage(
-                                  teenId: teen.id,
-                                  adultId: adultId,
-                                  adultName: adultName,
-                                ),
-                              ),
-                            );
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${data['name']} ${data['surname']}',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    _StarRating(rating: rating),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${rating.toStringAsFixed(1)} ★ ($reviewCount)',
-                                      style: const TextStyle(
-                                          fontSize: 12, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                                if (skills.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 6,
-                                    children: skills
-                                        .map((s) => Chip(label: Text(s)))
-                                        .toList(),
-                                  ),
-                                ],
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: ElevatedButton(
-                                    onPressed: () => hireTeen(
-                                      context,
-                                      teen.id,
-                                      adultName,
-                                    ),
-                                    child: const Text('Hire'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
-            ],
-          );
-  }
-
-  Widget _buildMyTeens(String adultName) {
-    // For now, this could fetch teens the adult has previously hired.
-    final previouslyHiredTeensQuery = FirebaseFirestore.instance
-        .collection('hire_requests')
-        .where('adultId', isEqualTo: adultId)
-        .where('status', isEqualTo: 'completed');
-        
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        const Text(
-          'My Teens (Previously Hired)',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              contentPadding: const EdgeInsets.symmetric(vertical: 20),
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        StreamBuilder<QuerySnapshot>(
-          stream: previouslyHiredTeensQuery.snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-            
-            final docs = snapshot.data!.docs;
-            if (docs.isEmpty) {
-              return const Text('You haven\'t hired any teens yet.', style: TextStyle(color: Colors.grey));
-            }
-            
-            // Extract unique teen IDs
-            final teenIds = docs.map((doc) => doc.data() as Map<String, dynamic>).map((data) => data['teenId'] as String).toSet().toList();
 
-            return Column(
-              children: teenIds.map((teenId) {
-                return Card(
-                  child: FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance.collection('users').doc(teenId).get(),
-                    builder: (context, teenSnapshot) {
-                      if (!teenSnapshot.hasData || !teenSnapshot.data!.exists) {
-                        return const ListTile(title: Text('Loading...'));
-                      }
-                      
-                      final data = teenSnapshot.data!.data() as Map<String, dynamic>;
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage: data['profilePhotoUrl'] != null 
-                              ? NetworkImage(data['profilePhotoUrl']) 
-                              : null,
-                          child: data['profilePhotoUrl'] == null ? const Icon(Icons.person) : null,
-                        ),
-                        title: Text('${data['name']} ${data['surname']}'),
-                        subtitle: Text(data['city'] ?? 'Unknown Location'),
-                        trailing: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => TeenDetailPage(
-                                  teenId: teenId,
-                                  adultId: adultId,
-                                  adultName: adultName,
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Text('View Profile'),
-                        ),
-                      );
-                    },
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .where('role', isEqualTo: 'teen') // ← Restoring mandatory role filter for rule compliance
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) return Center(child: Text('Database Error: ${snapshot.error}'));
+              if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+              if (!snapshot.hasData) return const Center(child: Text('No data from database.'));
+              
+              final allDocs = snapshot.data!.docs;
+
+              final filteredDocs = allDocs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                
+                // Firestore handles 'teen' role filter now; we only handle client-side search here.
+                if (_searchQuery.isEmpty) return true;
+
+                final String name = (data['name'] ?? '').toString().toLowerCase();
+                final String surname = (data['surname'] ?? '').toString().toLowerCase();
+                final List skills = data['skills'] as List? ?? [];
+                
+                final String fullName = '$name $surname'.toLowerCase();
+                return fullName.contains(_searchQuery) || skills.any((s) => s.toString().toLowerCase().contains(_searchQuery));
+              }).toList();
+
+              if (filteredDocs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off_rounded, size: 48, color: Colors.grey.withOpacity(0.5)),
+                      const SizedBox(height: 16),
+                      Text(
+                        _searchQuery.isEmpty ? 'No teens found in database' : 'No matches for "$_searchQuery"',
+                        style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
                 );
-              }).toList(),
-            );
-          },
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.72,
+                ),
+                itemCount: filteredDocs.length,
+                itemBuilder: (context, index) {
+                  final data = filteredDocs[index].data() as Map<String, dynamic>;
+                  return _buildModernTeenCard(filteredDocs[index].id, data, adultName);
+                },
+              );
+            },
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildMyJobs(String adultName) {
-    final activeJobsQuery = FirebaseFirestore.instance
+  Widget _buildManagement(String adultName) {
+    // Logic: Active jobs (pending/accepted) AND Completed jobs that need review.
+    final jobsQuery = FirebaseFirestore.instance
         .collection('hire_requests')
         .where('adultId', isEqualTo: adultId)
-        .where('status', isEqualTo: 'accepted');
+        .where('status', whereIn: ['accepted', 'pending', 'completed']);
 
-    final completedJobsQuery = FirebaseFirestore.instance
-        .collection('hire_requests')
-        .where('adultId', isEqualTo: adultId)
-        .where('status', isEqualTo: 'completed');
+    return StreamBuilder<QuerySnapshot>(
+      stream: jobsQuery.snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final docs = snapshot.data!.docs;
 
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        // 🔹 ACTIVE JOBS
-        const Text(
-                'Active Jobs',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-
-              StreamBuilder<QuerySnapshot>(
-                stream: activeJobsQuery.snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const SizedBox();
-                  if (snapshot.data!.docs.isEmpty) {
-                    return const Text('No active jobs',
-                        style: TextStyle(color: Colors.grey));
-                  }
-
-                  return Column(
-                    children: snapshot.data!.docs.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      return Card(
-                        color: Colors.blue.shade50,
-                        child: ListTile(
-                          title: Text(data['jobTitle'] ?? 'Job'),
-                          subtitle: FutureBuilder<DocumentSnapshot>(
-                            future: FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(data['teenId'])
-                                .get(),
-                            builder: (context, teenSnapshot) {
-                              if (!teenSnapshot.hasData) {
-                                return const Text('Loading teen...');
-                              }
-
-                              final teenData = teenSnapshot.data?.data()
-                                  as Map<String, dynamic>?;
-                              final teenName = teenData != null
-                                  ? '${teenData['name']} ${teenData['surname']}'
-                                  : 'Unknown Teen';
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  InkWell(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => TeenDetailPage(
-                                            teenId: data['teenId'],
-                                            adultId: adultId,
-                                            adultName: adultName,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    child: Text(
-                                      'Teen: $teenName',
-                                      style: const TextStyle(
-                                        color: Colors.blue,
-                                        decoration: TextDecoration.underline,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(data['date'] != null ? 'Date: ${_formatDate(data['date'] as Timestamp?)}' : 'Date: Anytime'),
-                                  Text('Pay: \$${data['budget'] ?? 0}'),
-                                ],
-                              );
-                            },
-                          ),
-                          trailing: ElevatedButton.icon(
-                            icon: const Icon(Icons.chat, size: 18),
-                            label: const Text('Chat'),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatPage(
-                                    chatId: doc.id,
-                                    title: data['jobTitle'] ?? 'Chat',
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 24),
-
-              // 🔹 COMPLETED JOBS + REVIEWS
-              const Text(
-                'Completed Jobs',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-
-              StreamBuilder<QuerySnapshot>(
-                stream: completedJobsQuery.snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const CircularProgressIndicator();
-                  }
-
-                  if (snapshot.data!.docs.isEmpty) {
-                    return const Text(
-                      'No completed jobs yet',
-                      style: TextStyle(color: Colors.grey),
-                    );
-                  }
-
-                  return Column(
-                    children: snapshot.data!.docs.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final teenId = data['teenId'] as String;
-
-                      return Card(
-                        child: FutureBuilder<DocumentSnapshot>(
-                          future: FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(teenId)
-                              .get(),
-                          builder: (context, teenSnapshot) {
-                            String teenName = 'Loading...';
-                            bool hasReviewedTeen = false;
-
-                            if (teenSnapshot.hasData &&
-                                teenSnapshot.data!.exists) {
-                              final teenData = teenSnapshot.data!.data()
-                                  as Map<String, dynamic>;
-                              teenName =
-                                  '${teenData['name'] ?? ''} ${teenData['surname'] ?? ''}'
-                                      .trim();
-                              if (teenName.isEmpty) teenName = 'Unknown Teen';
-
-                              final reviews =
-                                  (teenData['reviews'] as List<dynamic>?) ?? [];
-                              hasReviewedTeen = reviews
-                                  .any((r) => r['adultId'] == adultId);
-                            } else if (teenSnapshot.hasData &&
-                                !teenSnapshot.data!.exists) {
-                              teenName = 'Teen not found';
-                            }
-
-                            return ListTile(
-                              title: Text(data['jobTitle'] ?? 'Job'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  InkWell(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                           builder: (_) => TeenDetailPage(
-                                            teenId: teenId,
-                                            adultId: adultId,
-                                            adultName: adultName,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    child: Text(
-                                      'Teen: $teenName',
-                                      style: const TextStyle(
-                                        color: Colors.blue,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(data['date'] != null ? 'Date: ${_formatDate(data['date'] as Timestamp?)}' : 'Date: Anytime'),
-                                  Text('Pay: \$${data['budget'] ?? 0}'),
-                                ]
-                              ),
-                              trailing: (data['reviewed'] == true || hasReviewedTeen) ? 
-                                  ElevatedButton(
-                                    onPressed: null, // Disabled
-                                    style: ElevatedButton.styleFrom(
-                                      disabledBackgroundColor:
-                                          Colors.grey.shade300,
-                                      disabledForegroundColor:
-                                          Colors.grey.shade600,
-                                    ),
-                                    child: const Text('Already reviewed'),
-                                  ) : 
-                                  ElevatedButton(
-                                    onPressed: () => _handleLeaveReviewTap(
-                                      context,
-                                      doc.id,
-                                      teenId,
-                                    ),
-                                    child: const Text('Leave Review'),
-                                  ),
-                            );
-                          },
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
-            ],
+        if (docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.work_history_rounded, size: 64, color: AppTheme.darkBlue.withOpacity(0.1)),
+                const SizedBox(height: 16),
+                Text(
+                  'No active jobs right now',
+                  style: GoogleFonts.plusJakartaSans(color: Colors.grey, fontWeight: FontWeight.w600),
+                ),
+                TextButton(
+                  onPressed: () => setState(() => _currentIndex = 0),
+                  child: const Text('Start Hiring'),
+                ),
+              ],
+            ),
           );
-  }
+        }
 
-  // 🔒 Ensure only one review per adult–teen pair
-  Future<void> _handleLeaveReviewTap(
-    BuildContext context,
-    String hireRequestId,
-    String teenId,
-  ) async {
-    final firestore = FirebaseFirestore.instance;
+        // Identify teens who have ALREADY been reviewed by this adult across any job
+        final reviewedTeens = docs
+            .where((doc) => (doc.data() as Map<String, dynamic>)['reviewed'] == true)
+            .map((doc) => doc['teenId'] as String)
+            .toSet();
 
-    final teenDoc = await firestore.collection('users').doc(teenId).get();
-    final teenData = teenDoc.data() ?? {};
-    final reviews = teenData['reviews'] as List<dynamic>? ?? [];
+        final activeJobs = docs.where((doc) => doc['status'] != 'completed').toList();
+        final pendingReviews = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final isCompleted = data['status'] == 'completed';
+          final notReviewedInThisJob = data['reviewed'] != true;
+          final neverReviewedBefore = !reviewedTeens.contains(data['teenId']);
+          return isCompleted && notReviewedInThisJob && neverReviewedBefore;
+        }).toList();
 
-    final hasReviewed = reviews.any((review) =>
-        review is Map<String, dynamic> && review['adultId'] == widget.adultId);
-
-    if (hasReviewed) {
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Already reviewed'),
-            content: const Text('You have already reviewed this person.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      }
-      return;
-    }
-
-    _openReviewDialog(context, hireRequestId, teenId);
-  }
-
-  // ⭐ Review dialog + Firestore transaction
-  void _openReviewDialog(
-    BuildContext context,
-    String hireRequestId,
-    String teenId,
-  ) async {
-    final firestore = FirebaseFirestore.instance;
-    // For demo purposes, we can get name from AdultDashboard fields or Firestore
-    final adultDoc = await firestore.collection('users').doc(widget.adultId).get();
-    final adultName = adultDoc.data()?['name'] ?? 'Adult';
-
-    double ratingValue = 5;
-    bool wouldHireAgain = true; // default 
-    final commentController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Leave a Review'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButton<double>(
-                value: ratingValue,
-                items: [1, 2, 3, 4, 5]
-                    .map(
-                      (v) => DropdownMenuItem(
-                        value: v.toDouble(),
-                        child: Text('$v Stars'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  ratingValue = v!;
-                  if (ratingValue <= 3) {
-                    wouldHireAgain = false;
-                  } else {
-                    wouldHireAgain = true;
-                  }
-                }),
-              ),
-              TextField(
-                controller: commentController,
-                maxLength: 500,
-                decoration: const InputDecoration(
-                  labelText: 'Comment (optional)',
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          children: [
+            if (activeJobs.isNotEmpty) ...[
+              Text('In Progress', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.darkBlue)),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.black.withOpacity(0.05)),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: activeJobs.length,
+                  separatorBuilder: (context, index) => Divider(height: 1, color: Colors.black.withOpacity(0.05)),
+                  itemBuilder: (context, index) {
+                    final data = activeJobs[index].data() as Map<String, dynamic>;
+                    return _buildModernJobCard(activeJobs[index].id, data, adultName);
+                  },
                 ),
               ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Would you hire again?'),
-                value: wouldHireAgain,
-                onChanged: (bool value) => setState(() => wouldHireAgain = value),
-              )
+              const SizedBox(height: 32),
+            ],
+
+            if (pendingReviews.isNotEmpty) ...[
+              Text('Pending Reviews', style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.darkBlue)),
+              const SizedBox(height: 12),
+              ...pendingReviews.map((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.blue.withOpacity(0.1)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(data['jobTitle'] ?? 'Job', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, color: AppTheme.darkBlue)),
+                            if (data['teenName'] != null)
+                              Text('Done by ${data['teenName']}', style: GoogleFonts.plusJakartaSans(fontSize: 13, color: Colors.black45, fontWeight: FontWeight.w600))
+                            else
+                              FutureBuilder<DocumentSnapshot>(
+                                future: FirebaseFirestore.instance.collection('users').doc(data['teenId']).get(),
+                                builder: (context, snapshot) {
+                                  String name = 'a Teen';
+                                  if (snapshot.hasData && snapshot.data!.exists) {
+                                    final d = snapshot.data!.data() as Map<String, dynamic>;
+                                    name = '${d['name'] ?? ''} ${d['surname'] ?? ''}'.trim();
+                                  }
+                                  return Text('Done by $name', style: GoogleFonts.plusJakartaSans(fontSize: 13, color: Colors.black45, fontWeight: FontWeight.w600));
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => _showReviewDialog(doc.id, data, adultName),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text('Review', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800)),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildModernTeenCard(String teenId, Map<String, dynamic> data, String adultName) {
+    final double rating = (data['avgRating'] ?? 0).toDouble();
+    final skills = List<String>.from(data['skills'] ?? []);
+    final String name = data['name'] ?? 'User';
+    final String surname = data['surname'] ?? '';
+    final String age = data['age']?.toString() ?? '17';
+    final String initials = (name.isNotEmpty ? name[0] : '') + (surname.isNotEmpty ? surname[0] : '');
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withOpacity(0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  const Icon(Icons.star_rounded, color: Colors.orange, size: 16),
+                  const SizedBox(width: 2),
+                  Text(
+                    rating.toStringAsFixed(1),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800, 
+                      color: AppTheme.darkBlue,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+          const SizedBox(height: 12),
+          Text(
+            '$name $surname, $age',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              color: AppTheme.darkBlue,
             ),
-            ElevatedButton(
-              onPressed: () async {
-                final firestore = FirebaseFirestore.instance;
-
-                await firestore.runTransaction((tx) async {
-                  final teenRef = firestore.collection('users').doc(teenId);
-                  final teenSnap = await tx.get(teenRef);
-                  final teenData = teenSnap.data() ?? {};
-
-                  final double oldAvg =
-                      (teenData['avgRating'] ?? teenData['rating'] ?? 0)
-                          .toDouble();
-                  final int oldCount =
-                      ((teenData['reviewCount'] ?? teenData['ratingCount'] ?? 0)
-                              as num)
-                          .toInt();
-
-                  final newAvg =
-                      ((oldAvg * oldCount) + ratingValue) / (oldCount + 1);
-
-                  final existingReviews =
-                      (teenData['reviews'] as List<dynamic>?) ?? [];
-
-                  final newReview = {
-                    'adultId': widget.adultId,
-                    'adultName': adultName,
-                    'rating': ratingValue,
-                    'comment': commentController.text.trim(),
-                    'wouldHireAgain': wouldHireAgain,
-                    'createdAt': Timestamp.now(),
-                    'hireRequestId': hireRequestId,
-                  };
-
-                  final updatedReviews = [...existingReviews, newReview];
-
-                  final stats = Map<String, dynamic>.from((teenData['stats'] as Map<String, dynamic>?) ?? {});
-                  if (wouldHireAgain) {
-                    stats['repeatHires'] = (stats['repeatHires'] as num? ?? 0).toInt() + 1;
-                  }
-
-                  tx.update(teenRef, {
-                    'avgRating': double.parse(newAvg.toStringAsFixed(1)),
-                    'reviewCount': oldCount + 1,
-                    'reviews': updatedReviews,
-                    'stats': stats,
-                  });
-
-                  tx.update(
-                    firestore.collection('hire_requests').doc(hireRequestId),
-                    {'reviewed': true},
-                  );
-                });
-
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Review submitted')),
-                  );
-                }
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined, color: Colors.black26, size: 14),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  data['city'] ?? 'NYC',
+                  style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.access_time_outlined, color: Colors.black26, size: 14),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Weekends',
+                  style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: skills.take(2).map((s) => _buildModernChip(s)).toList(),
+          ),
+          const SizedBox(height: 12), // Replaced Spacer() with a fixed SizedBox to stabilize GridView rendering
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TeenDetailPage(teenId: teenId, adultId: adultId, adultName: adultName),
+                  ),
+                );
               },
-              child: const Text('Submit'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text('View Profile', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernJobCard(String jobId, Map<String, dynamic> data, String adultName) {
+    final status = data['status'] ?? 'pending';
+    final String title = data['jobTitle'] ?? 'Task Engagement';
+    final String location = data['locationText'] ?? 'Remote';
+    final double budget = (data['budget'] ?? 0).toDouble();
+
+    return InkWell(
+      onTap: () => _showJobDetails(jobId, data),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Icon(Icons.attach_money_rounded, color: Colors.orange, size: 24),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: AppTheme.darkBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined, color: Colors.black26, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        location,
+                        style: GoogleFonts.plusJakartaSans(
+                          color: Colors.black38, 
+                          fontSize: 13, 
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (status == 'accepted')
+                      Padding(
+                        padding: const EdgeInsets.only(right: 20),
+                        child: InkWell(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatPage(chatId: jobId, title: title),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.chat_bubble_outline_rounded, size: 22, color: Colors.blue),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Chat',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    Text(
+                      '\$$budget/hr',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: AppTheme.darkBlue,
+                      ),
+                    ),
+                  ],
+                ),
+                if (status == 'pending')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'PENDING',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppTheme.accentOrange,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
-  final List<String> _allSkills = [
-    'Lawn Care',
-    'Car Wash',
-    'Babysitting',
-    'Tutoring',
-    'Design',
-    'Errands',
-    'Events',
-  ];
 
-  void _showFilterSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  Widget _buildModernChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.teal.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
       ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Filters',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          setModalState(() {
-                            _selectedSkills = [];
-                            _minRating = 0.0;
-                            _minAge = 13;
-                            _maxAge = 17;
-                            _remoteOnly = false;
-                          });
-                          setState(() {});
-                          Navigator.pop(context);
-                        },
-                        child: const Text('Clear All'),
-                      ),
-                    ],
+      child: Text(
+        label,
+        style: GoogleFonts.plusJakartaSans(color: AppTheme.teal, fontSize: 12, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _buildModernStatusBadge(String status) {
+    Color color = Colors.grey;
+    if (status == 'accepted') color = AppTheme.teal;
+    if (status == 'pending') color = AppTheme.accentOrange;
+    if (status == 'completed') color = Colors.blue;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: GoogleFonts.plusJakartaSans(color: color, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.black.withOpacity(0.05))),
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: _currentIndex == 0 ? Colors.blue : Colors.orange,
+        unselectedItemColor: Colors.black26,
+        selectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 12),
+        unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 12),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: Icon(Icons.group_outlined),
+            ), 
+            label: 'Find Teens',
+          ),
+          BottomNavigationBarItem(
+            icon: Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: Icon(Icons.business_center_outlined),
+            ), 
+            label: 'Active Jobs',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationBadge() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(adultId)
+          .collection('items')
+          .where('read', isEqualTo: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        int count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+        return IconButton(
+          icon: Stack(
+            children: [
+              const Icon(Icons.notifications_none_rounded, color: AppTheme.darkBlue, size: 28),
+              if (count > 0)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
+                    child: Text('$count', style: const TextStyle(color: Colors.white, fontSize: 8)),
                   ),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  const Text('Skills', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: _allSkills.map((skill) {
-                      final isSelected = _selectedSkills.contains(skill.toLowerCase());
-                      return FilterChip(
-                        label: Text(skill),
-                        selected: isSelected,
-                        onSelected: (val) {
-                          setModalState(() {
-                            if (val) {
-                              _selectedSkills.add(skill.toLowerCase());
-                            } else {
-                              _selectedSkills.remove(skill.toLowerCase());
-                            }
-                          });
-                          setState(() {});
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('Minimum Rating', style: TextStyle(fontWeight: FontWeight.bold)),
-                  Slider(
-                    value: _minRating,
-                    min: 0,
-                    max: 5,
-                    divisions: 5,
-                    label: '${_minRating.toStringAsFixed(1)}+ Stars',
-                    onChanged: (val) {
-                      setModalState(() => _minRating = val);
-                      setState(() {});
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('Age Range', style: TextStyle(fontWeight: FontWeight.bold)),
-                  RangeSlider(
-                    values: RangeValues(_minAge.toDouble(), _maxAge.toDouble()),
-                    min: 13,
-                    max: 17,
-                    divisions: 4,
-                    labels: RangeLabels('$_minAge', '$_maxAge'),
-                    onChanged: (val) {
-                      setModalState(() {
-                        _minAge = val.start.round();
-                        _maxAge = val.end.round();
-                      });
-                      setState(() {});
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  SwitchListTile(
-                    title: const Text('Remote Work Only'),
-                    value: _remoteOnly,
-                    onChanged: (val) {
-                      setModalState(() => _remoteOnly = val);
-                      if (mounted) setState(() {});
-                    },
-                  ),
-                  SwitchListTile(
-                    title: const Text('Sort by Distance'),
-                    subtitle: const Text('Closest teenagers first'),
-                    value: _sortByDistance,
-                    onChanged: (val) {
-                      setModalState(() => _sortByDistance = val);
-                      setState(() {});
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Apply Filters'),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            );
-          },
+                ),
+            ],
+          ),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsPage(uid: adultId))),
         );
       },
     );
   }
-}
 
-/// ⭐ Simple star renderer
-class _StarRating extends StatelessWidget {
-  final double rating;
+  void _showReviewDialog(String jobId, Map<String, dynamic> data, String adultName) {
+    double selectedRating = 5;
+    final TextEditingController commentController = TextEditingController();
 
-  const _StarRating({required this.rating});
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(
+            left: 32, right: 32, top: 32,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Review Performance', style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.darkBlue)),
+              const SizedBox(height: 8),
+              Text('How was your experience with ${data['teenName'] ?? 'the teen'}?', style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 32),
+              
+              Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(5, (index) => IconButton(
+                    icon: Icon(
+                      index < selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: index < selectedRating ? Colors.orange : Colors.grey.shade300,
+                      size: 40,
+                    ),
+                    onPressed: () => setModalState(() => selectedRating = index + 1.0),
+                  )),
+                ),
+              ),
+              const SizedBox(height: 32),
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(5, (index) {
-        if (rating >= index + 1) {
-          return const Icon(Icons.star, size: 16, color: Colors.amber);
-        } else if (rating > index && rating < index + 1) {
-          return const Icon(Icons.star_half, size: 16, color: Colors.amber);
-        } else {
-          return const Icon(Icons.star_border, size: 16, color: Colors.amber);
-        }
-      }),
+              TextField(
+                controller: commentController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Share more details (optional)...',
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _submitReview(jobId, data['teenId'], selectedRating, commentController.text, adultName);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.darkBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                  child: Text('Submit Review', style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitReview(String jobId, String teenId, double rating, String comment, String adultName) async {
+    final firestore = FirebaseFirestore.instance;
+    
+    try {
+      await firestore.runTransaction((transaction) async {
+        final teenRef = firestore.collection('users').doc(teenId);
+        final teenSnap = await transaction.get(teenRef);
+        final teenData = teenSnap.data() as Map<String, dynamic>? ?? {};
+
+        // Recalculate Rating
+        final int oldCount = ((teenData['reviewCount'] ?? 0) as num).toInt();
+        final double oldAvg = (teenData['avgRating'] ?? 0).toDouble();
+        final double newAvg = ((oldAvg * oldCount) + rating) / (oldCount + 1);
+
+        // Update Teen
+        transaction.update(teenRef, {
+          'avgRating': newAvg,
+          'reviewCount': FieldValue.increment(1),
+          'reviews': FieldValue.arrayUnion([{
+            'rating': rating,
+            'comment': comment,
+            'adultName': adultName,
+            'createdAt': Timestamp.now(),
+          }]),
+        });
+
+        // Update Job Request
+        transaction.update(firestore.collection('hire_requests').doc(jobId), {
+          'reviewed': true,
+          'rating': rating,
+          'comment': comment,
+        });
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review submitted! Thank you.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  void _showJobDetails(String jobId, Map<String, dynamic> data) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Job Details', style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.darkBlue)),
+            const SizedBox(height: 24),
+            _buildDetailRow('Description', data['jobDescription'] ?? 'N/A'),
+            _buildDetailRow('Budget', '\$${data['budget'] ?? 0}'),
+            _buildDetailRow('Date', data['date'] != null ? _formatDate(data['date'] as Timestamp?) : 'Anytime'),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 100, child: Text(label, style: GoogleFonts.plusJakartaSans(color: Colors.black38, fontWeight: FontWeight.w700))),
+          Expanded(child: Text(value, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600))),
+        ],
+      ),
     );
   }
 }
