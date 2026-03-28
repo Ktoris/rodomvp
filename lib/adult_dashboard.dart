@@ -242,7 +242,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  childAspectRatio: 2,
+                  childAspectRatio: 0.92, // ← Clips neatly just below "View Profile" button
                 ),
                 itemCount: filteredDocs.length,
                 itemBuilder: (context, index) {
@@ -339,7 +339,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
                 final data = doc.data() as Map<String, dynamic>;
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.blue.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(20),
@@ -399,7 +399,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
     final String initials = (name.isNotEmpty ? name[0] : '') + (surname.isNotEmpty ? surname[0] : '');
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -407,13 +407,14 @@ class _AdultDashboardState extends State<AdultDashboard> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min, // ← Keeps column as tight as content allows
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: Colors.blue.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -424,7 +425,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
                     style: GoogleFonts.plusJakartaSans(
                       color: Colors.blue,
                       fontWeight: FontWeight.w800,
-                      fontSize: 15,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -446,53 +447,53 @@ class _AdultDashboardState extends State<AdultDashboard> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6), // gap after avatar row
           Text(
             '$name $surname, $age',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.plusJakartaSans(
               fontWeight: FontWeight.w800,
-              fontSize: 15,
+              fontSize: 13,
               color: AppTheme.darkBlue,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, color: Colors.black26, size: 14),
-              const SizedBox(width: 4),
+              const Icon(Icons.location_on_outlined, color: Colors.black26, size: 12),
+              const SizedBox(width: 3),
               Expanded(
                 child: Text(
                   data['city'] ?? 'NYC',
-                  style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontSize: 11, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Row(
             children: [
-              const Icon(Icons.access_time_outlined, color: Colors.black26, size: 14),
-              const SizedBox(width: 4),
+              const Icon(Icons.access_time_outlined, color: Colors.black26, size: 12),
+              const SizedBox(width: 3),
               Expanded(
                 child: Text(
                   'Weekends',
-                  style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.plusJakartaSans(color: Colors.black45, fontSize: 11, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           Wrap(
             spacing: 4,
             runSpacing: 4,
             children: skills.take(2).map((s) => _buildModernChip(s)).toList(),
           ),
-          const SizedBox(height: 12), // Replaced Spacer() with a fixed SizedBox to stabilize GridView rendering
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
-            height: 38,
+            height: 32, // compact button
             child: ElevatedButton(
               onPressed: () {
                 Navigator.push(
@@ -637,14 +638,14 @@ class _AdultDashboardState extends State<AdultDashboard> {
 
   Widget _buildModernChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // ← Slightly tighter chip
       decoration: BoxDecoration(
         color: AppTheme.teal.withOpacity(0.05),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         label,
-        style: GoogleFonts.plusJakartaSans(color: AppTheme.teal, fontSize: 12, fontWeight: FontWeight.w700),
+        style: GoogleFonts.plusJakartaSans(color: AppTheme.teal, fontSize: 11, fontWeight: FontWeight.w700),
       ),
     );
   }
