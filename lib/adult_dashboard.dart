@@ -242,7 +242,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  childAspectRatio: 0.72,
+                  childAspectRatio: 0.8,
                 ),
                 itemCount: filteredDocs.length,
                 itemBuilder: (context, index) {
