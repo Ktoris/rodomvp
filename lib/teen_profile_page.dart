@@ -70,168 +70,132 @@ class _TeenProfilePageState extends State<TeenProfilePage> {
       'skills': selectedSkills.toList(),
       'avgRating': 0.0,
       'reviewCount': 0,
-      'reviews': [], 
-      'profilePhotoUrl': null, 
-      'portfolio': [],
-      'stats': {
-        'jobsDone': 0,
-        'totalEarned': 0,
-        'lessonsCompleted': 0,
-        'repeatHires': 0,
-        'avgRating': 0.0,
-        'totalReviews': 0
-      },
-      'badges': [],
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
     if (!mounted) return;
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TeenDashboard(teenId: uid),
-      ),
-    );
+    // Note: Manual navigation removed. RoleRouter now handles the transition reactively.
   }
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final data = snapshot.data!.data() as Map<String, dynamic>?;
-        if (data != null && data.containsKey('name')) {
-          return TeenDashboard(teenId: uid);
-        }
-
-        return Scaffold(
-          appBar: AppBar(title: const Text('Create Teen Profile')),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      appBar: AppBar(title: const Text('Create Teen Profile')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Tell us about yourself!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'First Name *'),
+            ),
+            TextField(
+              controller: surnameController,
+              decoration: const InputDecoration(labelText: 'Last Name *'),
+            ),
+            Row(
               children: [
-                const Text('Tell us about yourself!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'First Name *'),
-                ),
-                TextField(
-                  controller: surnameController,
-                  decoration: const InputDecoration(labelText: 'Last Name *'),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: ageController,
-                        decoration: const InputDecoration(labelText: 'Age *'),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextField(
-                        controller: hourlyRateController,
-                        decoration: const InputDecoration(labelText: 'Hourly Rate (\$) *'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      ),
-                    ),
-                  ],
-                ),
-                TextField(
-                  controller: cityController,
-                  decoration: const InputDecoration(labelText: 'City * (e.g. Austin, TX)'),
-                ),
-
-                const SizedBox(height: 16),
-                TextField(
-                  controller: bioController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Bio',
-                    hintText: 'Tell adults a bit about yourself, your goals, and why you are a great hire.',
+                Expanded(
+                  child: TextField(
+                    controller: ageController,
+                    decoration: const InputDecoration(labelText: 'Age *'),
+                    keyboardType: TextInputType.number,
                   ),
                 ),
-
-                const SizedBox(height: 20),
-                const Text('Availability', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                AvailabilityCalendar(
-                  selectedSlots: selectedAvailability,
-                  onChanged: (newSlots) {
-                    setState(() {
-                      selectedAvailability.clear();
-                      selectedAvailability.addAll(newSlots);
-                    });
-                  },
-                ),
-
-                const SizedBox(height: 20),
-                const Text('Skills', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: skillInputController,
-                        decoration: const InputDecoration(
-                          labelText: 'Add a skill',
-                          hintText: 'Example: Dog walking',
-                        ),
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: _addSkillFromInput,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: () => _addSkillFromInput(),
-                      tooltip: 'Add skill',
-                    ),
-                  ],
-                ),
-                Wrap(
-                  spacing: 6,
-                  children: selectedSkills.map((skill) {
-                    return Chip(
-                      label: Text(skill),
-                      deleteIcon: const Icon(Icons.close, size: 16),
-                      onDeleted: () {
-                        setState(() => selectedSkills.remove(skill));
-                      },
-                    );
-                  }).toList(),
-                ),
-
-                const SizedBox(height: 30),
-                Center(
-                  child: ElevatedButton(
-                    onPressed: saveProfile,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    child: const Text('Save Profile'),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextField(
+                    controller: hourlyRateController,
+                    decoration: const InputDecoration(labelText: 'Hourly Rate (\$) *'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
                 ),
-                const SizedBox(height: 40),
               ],
             ),
-          ),
-        );
-      },
+            TextField(
+              controller: cityController,
+              decoration: const InputDecoration(labelText: 'City * (e.g. Austin, TX)'),
+            ),
+
+            const SizedBox(height: 16),
+            TextField(
+              controller: bioController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Bio',
+                hintText: 'Tell adults a bit about yourself, your goals, and why you are a great hire.',
+              ),
+            ),
+
+            const SizedBox(height: 20),
+            const Text('Availability', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            AvailabilityCalendar(
+              selectedSlots: selectedAvailability,
+              onChanged: (newSlots) {
+                setState(() {
+                  selectedAvailability.clear();
+                  selectedAvailability.addAll(newSlots);
+                });
+              },
+            ),
+
+            const SizedBox(height: 20),
+            const Text('Skills', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: skillInputController,
+                    decoration: const InputDecoration(
+                      labelText: 'Add a skill',
+                      hintText: 'Example: Dog walking',
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: _addSkillFromInput,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _addSkillFromInput(),
+                  tooltip: 'Add skill',
+                ),
+              ],
+            ),
+            Wrap(
+              spacing: 6,
+              children: selectedSkills.map((skill) {
+                return Chip(
+                  label: Text(skill),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  onDeleted: () {
+                    setState(() => selectedSkills.remove(skill));
+                  },
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 30),
+            Center(
+              child: ElevatedButton(
+                onPressed: saveProfile,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                child: const Text('Save Profile'),
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
     );
   }
 }

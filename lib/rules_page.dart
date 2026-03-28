@@ -24,14 +24,8 @@ class _RulesPageState extends State<RulesPage> {
           'agreedAt': FieldValue.serverTimestamp(),
         }
       });
-      if (mounted) {
-        if (widget.isOnboarding) {
-          Navigator.pop(context);
-        } else {
-          // If forced from dashboard, we might want to refresh or pop
-          Navigator.pop(context);
-        }
-      }
+      // The RoleRouter StreamBuilder will now automatically detect the change and swap the view
+      // No Navigator.pop needed in the onboarding context
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

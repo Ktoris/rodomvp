@@ -9,6 +9,9 @@ import 'adult_dashboard.dart';
 import 'verify_email_page.dart';
 import 'pending_parent_page.dart';
 
+import 'role_router.dart';
+import 'rules_page.dart';
+
 class RoleRouter extends StatelessWidget {
   const RoleRouter({super.key});
 
@@ -16,46 +19,66 @@ class RoleRouter extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
 
-    // 🔒 EMAIL VERIFICATION DISABLED — uncomment to re-enable
-    // if (!user.emailVerified) {
-    //   return const VerifyEmailPage();
-    // }
-
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .get(),
+          .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                    const SizedBox(height: 16),
+                    Text('Database Error: ${snapshot.error}', textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => FirebaseAuth.instance.signOut(),
+                      child: const Text('Sign Out & Try Again'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         if (!snapshot.hasData) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        final data = snapshot.data!.data() as Map<String, dynamic>;
-        final role = data['role'];
-        final accountStatus = data.containsKey('accountStatus') ? data['accountStatus'] : null;
-
-        // 🔒 GUARDIAN APPROVAL DISABLED — uncomment to re-enable
-        // if (role == 'teen' && accountStatus == 'pending_parent') {
-        //   return const PendingParentPage();
-        // }
-
-        // 🔹 TEEN FLOW
-        if (role == 'teen') {
-          if (data.containsKey('name')) {
-            return TeenDashboard(teenId: user.uid);
-          }
-          return const TeenProfilePage();
+        final doc = snapshot.data!;
+        if (!doc.exists) {
+          return const Scaffold(
+            body: Center(child: Text('User record not found')),
+          );
         }
 
-        // 🔹 ADULT FLOW
+        final data = doc.data() as Map<String, dynamic>;
+        final role = data['role'];
+        final hasName = data.containsKey('name');
+        
+        // Check if the user has agreed to rules
+        final agreedToRules = data['agreedToRules']?['agreed'] == true;
+
+        // 🔹 TEEN FLOW (3-Step Onboarding)
+        if (role == 'teen') {
+          if (!hasName) return const TeenProfilePage();
+          if (!agreedToRules) return RulesPage(uid: user.uid, isOnboarding: true);
+          return TeenDashboard(teenId: user.uid);
+        }
+
+        // 🔹 ADULT FLOW (2-Step Onboarding)
+        // Restored as perfectly working previously
         if (role == 'adult') {
-          if (data.containsKey('name')) {
-            return AdultDashboard(adultId: user.uid);
-          }
-          return const AdultProfilePage();
+          if (!hasName) return const AdultProfilePage();
+          return AdultDashboard(adultId: user.uid);
         }
 
         // 🔹 Fallback for unknown role

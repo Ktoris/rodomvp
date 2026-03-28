@@ -148,14 +148,7 @@ class _TeenDashboardState extends State<TeenDashboard> {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final teenData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
         
-        // Rules Check
-        final agreedData = teenData['agreedToRules'] as Map<String, dynamic>?;
-        if (agreedData == null || agreedData['agreed'] != true) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => RulesPage(uid: widget.teenId, isOnboarding: true)));
-          });
-          return const Center(child: Text('Reviewing community guidelines...'));
-        }
+        // Note: Redundant rules check removed. RoleRouter ensures teens agree to rules before this build is triggered.
 
         final skills = List<String>.from(teenData['skills'] ?? []);
         final double rating = (teenData['avgRating'] ?? 0).toDouble();
