@@ -339,7 +339,7 @@ class _AdultDashboardState extends State<AdultDashboard> {
                 final data = doc.data() as Map<String, dynamic>;
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.blue.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(20),
